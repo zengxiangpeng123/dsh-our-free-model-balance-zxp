@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-ofm-balance',
+  id: 'dsh-ofm-balance-zxp',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -21,8 +21,8 @@ window.__ModuleLoader__.load({
     // harness can be mounted under a reverse-proxy sub-path, where a leading
     // slash drops the prefix and the request misses the app entirely.
     const ENDPOINT = (() => {
-      try { return new URL('api/ofm-balance', document.baseURI).pathname; }
-      catch { return '/api/ofm-balance'; }
+      try { return new URL('api/ofm-balance-zxp', document.baseURI).pathname; }
+      catch { return '/api/ofm-balance-zxp'; }
     })();
 
     const STYLE_ID = 'ofm-balance-styles';
@@ -137,7 +137,7 @@ window.__ModuleLoader__.load({
     `;
 
     // Visible copy lives in dictionaries, not inline in the component.
-    const NS = 'ofm-balance';
+    const NS = 'ofm-balance-zxp';
 
     // The ten channel ids, mirrored from the host table. A model whose provider
     // is not in this set has no channel balance and gets no chip at all, which
@@ -516,7 +516,7 @@ window.__ModuleLoader__.load({
 
         ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
           name: 'conversation.input.left',
-          id: 'ofm-balance',
+          id: 'ofm-balance-zxp',
           order: 40,
         }, props => h(Boundary, null, h(Chip, { ...props, readConnection, t, channelIds: CHANNEL_IDS }))));
         return disposeStyles;

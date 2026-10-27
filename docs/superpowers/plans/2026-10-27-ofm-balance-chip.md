@@ -1,5 +1,7 @@
 # OFM 余额小图标 Implementation Plan
 
+> **包已更名（2026-10-27）**：本计划正文写于更名之前，凡是出现包名 `dsh-ofm-balance` 或路径 `…\local-bundles\dsh-ofm-balance` 之处，现应读作 `dsh-ofm-balance-zxp` 与 `…\local-bundles\dsh-ofm-balance-zxp`；接口路径同步为 `/api/ofm-balance-zxp`。本文保留原文以便追溯当时的判断。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 DSH 输入框工具行最左端加一个常驻小图标，点击展开面板显示 dsh-our-free-model 各渠道余额；不点击时不发任何请求。

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Our Free Model balance",
-    "description": "Shows the current channel's remaining credit beside the composer's model seat, with every channel one click away. No balance is queried until you click."
+    "title": "Our Free Model balance-zxp",
+    "description": "Shows the current channel's remaining credit beside the composer's model seat, with every channel one click away. Reads once when a session starts, then only when you refresh."
   }
 }
