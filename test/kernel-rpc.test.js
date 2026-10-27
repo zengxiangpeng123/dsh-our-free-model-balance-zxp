@@ -44,3 +44,25 @@ test('403 与 ok:false 都转成可读错误', async () => {
   const refused = makeKernelRpc(() => fakeConnection({ browserPeer: peer, handler: { async fetch() { return new Response(JSON.stringify({ result: { ok: false, error: { message: 'no pack' } } })) } } }))
   await assert.rejects(() => refused.call('x', {}), /no pack/)
 })
+
+// ── 审查 I5：非 2xx 与不对劲的信封都不能当成功 ─────────────────────────────
+
+test('404 + JSON 正文必须算失败，不能被当成"没有渠道"', async () => {
+  const handler = {
+    async fetch() {
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+    },
+  }
+  const rpc = makeKernelRpc(() => fakeConnection({ browserPeer: peer, handler }))
+  await assert.rejects(() => rpc.call('provider.status', { providers: ['loomy'] }), /404/)
+})
+
+test('缺 ok 字段的信封必须算失败', async () => {
+  const handler = {
+    async fetch() {
+      return new Response(JSON.stringify({ result: { value: { accounts: [] } } }))
+    },
+  }
+  const rpc = makeKernelRpc(() => fakeConnection({ browserPeer: peer, handler }))
+  await assert.rejects(() => rpc.call('credits.balances', { provider: 'loomy' }), /unexpected envelope/)
+})

@@ -220,6 +220,29 @@ window.__ModuleLoader__.load({
       hiddenChannels: [],
     });
 
+    /**
+     * The settings both surfaces share inside one page. The host owns the
+     * values; this exists so a change made on the settings page is visible to
+     * the chip immediately instead of on the next heartbeat.
+     */
+    const sharedSettings = { value: null, listeners: new Set() };
+
+    function setSharedSettings(next) {
+      sharedSettings.value = next;
+      for (const listener of sharedSettings.listeners) listener();
+    }
+
+    function useSharedSettings() {
+      const [value, setValue] = React.useState(sharedSettings.value);
+      React.useEffect(() => {
+        const listener = () => setValue(sharedSettings.value);
+        sharedSettings.listeners.add(listener);
+        listener();
+        return () => { sharedSettings.listeners.delete(listener); };
+      }, []);
+      return value;
+    }
+
     const DICT = {
       zh: {
         'panel.title': '渠道余额',
@@ -242,7 +265,11 @@ window.__ModuleLoader__.load({
         'foot.join': '，',
         'empty.none': '没有已登录的渠道',
         'empty.hint': '登录 Our Free Model 的渠道后出现在这里',
+        'empty.allHidden': '这些渠道都被你隐藏了',
+        'empty.allHiddenHint': '在设置 → 渠道余额里取消隐藏',
         'note.stale': '下面的数字来自上一次成功查询，可能已经不准（{reason}）',
+        'note.stalePlain': '下面的数字来自上一次成功查询，可能已经不准。',
+        'note.error': '读不到 Our Free Model：{reason}。确认它已安装并启用。',
         'settings.pageLabel': '渠道余额',
         'settings.loading': '读取设置…',
         'settings.refreshLegend': '刷新',
@@ -292,7 +319,11 @@ window.__ModuleLoader__.load({
         'foot.join': ', ',
         'empty.none': 'No channel is signed in',
         'empty.hint': 'Sign in to a channel in Our Free Model and it appears here',
+        'empty.allHidden': 'You have hidden every channel',
+        'empty.allHiddenHint': 'Unhide them in Settings → Channel balances',
         'note.stale': 'These numbers come from the last successful query and may be out of date ({reason})',
+        'note.stalePlain': 'These numbers come from the last successful query and may be out of date.',
+        'note.error': 'Cannot reach Our Free Model: {reason}. Check that it is installed and enabled.',
         'settings.pageLabel': 'Channel balances',
         'settings.loading': 'Reading settings…',
         'settings.refreshLegend': 'Refresh',
@@ -428,9 +459,10 @@ window.__ModuleLoader__.load({
       const provider = selection === null ? null : selection.provider;
       const channelId = provider !== null && props.channelIds.has(provider) ? provider : null;
 
-      const settings = (snapshot !== null && snapshot.settings !== undefined && snapshot.settings !== null)
+      const shared = useSharedSettings();
+      const settings = shared ?? ((snapshot !== null && snapshot.settings !== undefined && snapshot.settings !== null)
         ? snapshot.settings
-        : props.defaultSettings;
+        : props.defaultSettings);
       const autoRefreshSec = typeof settings.autoRefreshSec === 'number' ? settings.autoRefreshSec : 60;
 
       // Report presence and take whatever the host already has. The heartbeat
@@ -438,26 +470,42 @@ window.__ModuleLoader__.load({
       // watching. It never fetches balances itself.
       const beat = React.useCallback(async () => {
         const next = await watchNow();
-        if (next !== null) setSnapshot(next);
+        if (next === null) return;
+        setSnapshot(next);
+        // The host echoes the saved settings; adopting them keeps this page in
+        // step with a change made in another tab.
+        if (next.settings !== undefined && next.settings !== null) setSharedSettings(next.settings);
       }, []);
 
       React.useEffect(() => {
         if (channelId === null) return undefined;
         let alive = true;
         let timer = null;
+        const stop = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
+        // Re-arming is unconditional: success, failure, and a hidden page all
+        // leave exactly one timer waiting. A chain that only re-arms on the
+        // happy path dies the first time the user switches tabs — the poller
+        // then idles out and the chip freezes until a reload.
         const arm = () => {
+          stop();
+          if (!alive) return;
           const seconds = Math.min(60, autoRefreshSec > 0 ? autoRefreshSec : 60);
           timer = setTimeout(() => {
-            if (document.visibilityState === 'hidden') return;
-            void beat().then(() => { if (alive) arm(); });
+            if (!alive) return;
+            if (document.visibilityState === 'hidden') { arm(); return; }
+            void beat().finally(() => { if (alive) arm(); });
           }, Math.max(5, seconds) * 1000);
         };
-        const onVisible = () => { if (document.visibilityState === 'visible') void beat(); };
+        const onVisible = () => {
+          if (!alive || document.visibilityState !== 'visible') return;
+          stop();
+          void beat().finally(() => { if (alive) arm(); });
+        };
         document.addEventListener('visibilitychange', onVisible);
-        void beat().then(() => { if (alive) arm(); });
+        void beat().finally(() => { if (alive) arm(); });
         return () => {
           alive = false;
-          if (timer !== null) clearTimeout(timer);
+          stop();
           document.removeEventListener('visibilitychange', onVisible);
         };
       }, [channelId, autoRefreshSec, beat]);
@@ -511,17 +559,25 @@ window.__ModuleLoader__.load({
             ? `${byId.amount}${byId.partial ? '+?' : ''}`
             : (byId.state === 'empty' ? t('state.empty') : byId.state === 'unknown' ? t('state.unknown') : t('state.failed'));
       const chipUnit = (byId !== undefined && hasFuel(byId) && settings.showUnits !== false) ? byId.unitShort : '';
-      const chipMark = byId === undefined ? '#8A8F98' : (spending ? '#D92D33' : byId.accent);
-      const stamp = snapshot === null ? '' : clockText(snapshot.at);
+      const chipMark = byId === undefined
+        ? '#8A8F98'
+        : (spending && settings.redWhenSpent !== false ? '#D92D33' : byId.accent);
+      // `polledAt` is when the numbers were read; `at` is when this JSON was
+      // built. Only the former is honest as "last updated".
+      const stamp = snapshot === null ? '' : clockText(snapshot.polledAt ?? snapshot.at);
 
       let body;
       if (snapshot === null) {
         body = h('div', { className: 'ofm-balance-emptywrap' },
           h('div', { className: 'ofm-balance-emptyline' }, t('panel.loading')));
       } else if (visible.length === 0) {
+        const signedInCount = rows.filter(row => row.loggedIn === true).length;
+        const allHidden = signedInCount > 0;
         body = h('div', { className: 'ofm-balance-emptywrap' },
-          h('div', { className: 'ofm-balance-emptyline' }, rows.length === 0 ? t('panel.none') : t('empty.none')),
-          h('div', { className: 'ofm-balance-emptyhint' }, t('empty.hint')));
+          h('div', { className: 'ofm-balance-emptyline' },
+            allHidden ? t('empty.allHidden') : (rows.length === 0 ? t('panel.none') : t('empty.none'))),
+          h('div', { className: 'ofm-balance-emptyhint' },
+            allHidden ? t('empty.allHiddenHint') : t('empty.hint')));
       } else {
         body = h('div', { className: 'ofm-balance-list' }, visible.map(row => {
           const spent = isSpent(row);
@@ -559,9 +615,14 @@ window.__ModuleLoader__.load({
         }));
       }
 
-      const note = snapshot !== null && snapshot.stale === true
-        ? h('div', { className: 'ofm-balance-note' }, t('note.stale', { reason: errorNote === '' ? t('state.failed') : errorNote }))
-        : (errorNote === '' || visible.length === 0 ? null : h('div', { className: 'ofm-balance-note' }, errorNote));
+      // The reason line appears whenever the host reported one — including when
+      // there is nothing to list. Suppressing it in the empty case was exactly
+      // backwards: that is the first run after OFM is missing or disabled.
+      const note = errorNote !== ''
+        ? h('div', { className: 'ofm-balance-note' }, t('note.error', { reason: errorNote }))
+        : (snapshot !== null && snapshot.stale === true
+          ? h('div', { className: 'ofm-balance-note' }, t('note.stalePlain'))
+          : null);
 
       const panel = h('div', {
         className: 'ofm-balance-panel',
@@ -637,7 +698,10 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         let alive = true;
         void request('/settings').then(payload => {
-          if (alive && payload !== null && payload.settings) setSettings(payload.settings);
+          if (alive && payload !== null && payload.settings) {
+            setSettings(payload.settings);
+            setSharedSettings(payload.settings);
+          }
         });
         void readSnapshot().then(next => { if (alive && next !== null) setSnapshot(next); });
         return () => { alive = false; };
@@ -657,6 +721,10 @@ window.__ModuleLoader__.load({
         }
         setError('');
         setSettings(payload.settings);
+        // Tell the chip in this page right away; waiting for its next
+        // heartbeat is up to a minute of the user wondering whether the
+        // toggle did anything.
+        setSharedSettings(payload.settings);
       };
 
       const refreshNow = async () => {

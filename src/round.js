@@ -45,7 +45,17 @@ export function loggedInFromStatuses(statuses) {
 export async function fetchRound({ rpc, catalogue, timeoutMs, now = () => Date.now() }) {
   const ids = Array.isArray(catalogue) && catalogue.length > 0 ? catalogue : CHANNELS.map(channel => channel.id)
 
-  const status = await rpc.call('provider.status', { providers: [...ids] })
+  // The discovery call needs its own deadline too. Without one a hang leaves the
+  // poller's round in flight for ever: state stays `polling`, the client re-reads
+  // every two seconds, and nothing ever backs off or reports a reason.
+  const discovery = new AbortController()
+  const discoveryTimer = setTimeout(() => discovery.abort(), timeoutMs)
+  let status
+  try {
+    status = await rpc.call('provider.status', { providers: [...ids] }, discovery.signal)
+  } finally {
+    clearTimeout(discoveryTimer)
+  }
   const loggedIn = new Set(loggedInFromStatuses(status?.value?.statuses))
 
   const rows = await Promise.all(ids.map(async id => {

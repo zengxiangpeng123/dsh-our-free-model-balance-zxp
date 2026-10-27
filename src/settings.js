@@ -48,7 +48,10 @@ function sanitizeRefresh(value) {
   if (value === 0) return 0
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_SETTINGS.autoRefreshSec
   const rounded = Math.trunc(value)
-  if (rounded <= 0) return 0
+  // A negative or sub-second value is a typo, not a request to turn polling off
+  // — clamping keeps the user's intent ("some interval") instead of silently
+  // disabling the feature they came here to configure.
+  if (rounded === 0) return AUTO_REFRESH_MIN
   return Math.min(Math.max(rounded, AUTO_REFRESH_MIN), AUTO_REFRESH_MAX)
 }
 

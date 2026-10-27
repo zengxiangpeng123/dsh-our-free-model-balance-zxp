@@ -29,7 +29,12 @@ const CATALOGUE = CHANNELS.map(channel => channel.id)
 const CHANNEL_TIMEOUT_MS = 20_000
 
 function json(res, status, body) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
+  // The snapshot is a live reading, not a document: a cached copy is worse than
+  // no copy, because it looks up to date.
+  res.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+  })
   res.end(JSON.stringify(body))
 }
 

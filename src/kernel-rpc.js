@@ -89,7 +89,11 @@ export function makeKernelRpc(readConnection) {
         signal,
       })
       const response = await handler.fetch(request, peer)
-      if (response.status === 401 || response.status === 403) {
+      // Any non-2xx is a refusal. Checking only 401/403 was not enough: an
+      // unregistered route can answer 404 with a JSON body, which used to flow
+      // on as a "successful" empty answer — the exact failure mode of showing
+      // ten rows as "not signed in" when nothing was ever asked.
+      if (!response.ok) {
         throw new Error(`channel-pack refused (HTTP ${response.status})`)
       }
       const text = await response.text()
@@ -102,6 +106,12 @@ export function makeKernelRpc(readConnection) {
       const result = body?.result ?? body
       if (result?.ok === false) {
         throw new Error(result?.error?.message ?? result?.error?.code ?? 'channel-pack refused')
+      }
+      // The pack always answers `{ ok, value }`. Anything else (an error page,
+      // a bare object) is not an answer, and treating it as one is how "no
+      // channels" gets invented.
+      if (result?.ok !== true) {
+        throw new Error('channel-pack answered an unexpected envelope')
       }
       return result
     },
