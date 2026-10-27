@@ -164,7 +164,33 @@ window.__ModuleLoader__.load({
       .ofm-balance-emptyhint { margin-top: 4px; font-size: 10px; opacity: .5; line-height: 1.5; }
 
       .ofm-balance-foot { padding: 8px 13px 10px; font-size: 10px; opacity: .55; }
-      .ofm-balance-foot-spent { opacity: .55; }
+
+      /* Settings page. Same language as the popover: hairlines, no cards,
+         sentence case, one accent, nothing shouting. */
+      .ofm-balance-set { display: flex; flex-direction: column; gap: 20px; padding: 6px 0 14px; max-width: 560px; }
+      .ofm-balance-set-group { display: flex; flex-direction: column; gap: 7px; }
+      .ofm-balance-set-legend { font-size: 11px; opacity: .55; }
+      .ofm-balance-set-row { display: flex; align-items: center; gap: 10px; min-height: 26px; }
+      .ofm-balance-set-label { flex: 1 1 auto; font-size: 12px; }
+      .ofm-balance-set-hint { flex: 1 1 auto; font-size: 10.5px; opacity: .5; line-height: 1.5; }
+      .ofm-balance-set-control { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+      .ofm-balance-set select,
+      .ofm-balance-set input[type="number"] {
+        font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 6px;
+        border: 1px solid var(--dsw-alias-border-l2, rgba(128, 132, 140, .38));
+        background: var(--dsw-alias-bg-layer-1, Canvas); color: inherit;
+      }
+      .ofm-balance-set input[type="number"] { width: 78px; }
+      .ofm-balance-set input[type="checkbox"] { margin: 0; }
+      .ofm-balance-set-button {
+        font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 7px;
+        border: 1px solid var(--dsw-alias-border-l2, rgba(128, 132, 140, .38));
+        background: transparent; color: inherit; cursor: pointer;
+      }
+      .ofm-balance-set-button:hover { background: rgba(128, 132, 140, .12); }
+      .ofm-balance-set-button:focus-visible { outline: 2px solid var(--ofm-focus, #4C7DFF); outline-offset: 1px; }
+      .ofm-balance-set-error { font-size: 11px; color: #D92D33; }
+      .ofm-balance-set-channels { display: flex; flex-direction: column; gap: 3px; }
     `;
 
     // Visible copy lives in dictionaries, not inline in the component.
@@ -217,6 +243,33 @@ window.__ModuleLoader__.load({
         'empty.none': '没有已登录的渠道',
         'empty.hint': '登录 Our Free Model 的渠道后出现在这里',
         'note.stale': '下面的数字来自上一次成功查询，可能已经不准（{reason}）',
+        'settings.pageLabel': '渠道余额',
+        'settings.loading': '读取设置…',
+        'settings.refreshLegend': '刷新',
+        'settings.autoRefresh': '自动刷新',
+        'settings.off': '关闭（只在我点刷新时更新）',
+        'settings.custom': '自定义',
+        'settings.seconds': '秒',
+        'settings.refreshNow': '立即刷新',
+        'settings.updatedAt': '上次更新：{time}',
+        'settings.never': '还没取到过数据',
+        'settings.poller.idle': '正常',
+        'settings.poller.polling': '查询中',
+        'settings.poller.backoff': '失败，{delay} 秒后重试（{reason}）',
+        'settings.poller.stopped': '已暂停：没有界面在显示',
+        'settings.displayLegend': '显示项',
+        'settings.showTimestamp': '面板头部的时间戳',
+        'settings.showUnits': '数字后的单位',
+        'settings.showSpine': '当前渠道的彩色脊线',
+        'settings.showFooter': '面板底部的汇总',
+        'settings.redWhenSpent': '用尽时标红',
+        'settings.chipDot': '图标只显示一个小色点（低调）',
+        'settings.channelsLegend': '渠道',
+        'settings.showSignedOut': '也显示未登录的渠道',
+        'settings.hiddenHint': '隐藏只影响面板列表；你正在用的渠道仍会显示在图标上。',
+        'settings.noChannels': '还没有已登录的渠道',
+        'settings.reset': '恢复默认',
+        'settings.saveFailed': '保存失败，这次改动没有生效',
       },
       en: {
         'panel.title': 'Channel balances',
@@ -240,6 +293,33 @@ window.__ModuleLoader__.load({
         'empty.none': 'No channel is signed in',
         'empty.hint': 'Sign in to a channel in Our Free Model and it appears here',
         'note.stale': 'These numbers come from the last successful query and may be out of date ({reason})',
+        'settings.pageLabel': 'Channel balances',
+        'settings.loading': 'Reading settings…',
+        'settings.refreshLegend': 'Refresh',
+        'settings.autoRefresh': 'Refresh automatically',
+        'settings.off': 'Off (only when I press refresh)',
+        'settings.custom': 'Custom',
+        'settings.seconds': 'sec',
+        'settings.refreshNow': 'Refresh now',
+        'settings.updatedAt': 'Updated {time}',
+        'settings.never': 'Nothing read yet',
+        'settings.poller.idle': 'Healthy',
+        'settings.poller.polling': 'Reading',
+        'settings.poller.backoff': 'Failed, retrying in {delay}s ({reason})',
+        'settings.poller.stopped': 'Paused: nothing is showing it',
+        'settings.displayLegend': 'What to show',
+        'settings.showTimestamp': 'Timestamp in the panel header',
+        'settings.showUnits': 'Unit after each figure',
+        'settings.showSpine': 'Colour bar on the current channel',
+        'settings.showFooter': 'Summary line under the list',
+        'settings.redWhenSpent': 'Mark used-up channels in red',
+        'settings.chipDot': 'Chip shows only a small dot (quieter)',
+        'settings.channelsLegend': 'Channels',
+        'settings.showSignedOut': 'Also list channels with no account',
+        'settings.hiddenHint': 'Hiding affects the panel list only; the channel you are using still shows on the chip.',
+        'settings.noChannels': 'No channel is signed in yet',
+        'settings.reset': 'Restore defaults',
+        'settings.saveFailed': 'Save failed; that change did not take effect',
       },
     };
 
@@ -535,6 +615,205 @@ window.__ModuleLoader__.load({
         open ? panel : null);
     }
 
+    /** Auto-refresh choices offered as a dropdown; anything else is "custom". */
+    const REFRESH_CHOICES = [0, 30, 60, 300];
+
+    /**
+     * The settings page.
+     *
+     * One page, one job: let the user decide how often the numbers refresh and
+     * which parts of the readout they want. Every change saves immediately —
+     * a settings page with a Save button invites the state where the user
+     * changes something, navigates away, and cannot tell whether it took.
+     */
+    function SettingsPage(props) {
+      const t = props.t;
+      const [settings, setSettings] = React.useState(null);
+      const [snapshot, setSnapshot] = React.useState(null);
+      const [error, setError] = React.useState('');
+      const [draftSeconds, setDraftSeconds] = React.useState('');
+      const [busy, setBusy] = React.useState(false);
+
+      React.useEffect(() => {
+        let alive = true;
+        void request('/settings').then(payload => {
+          if (alive && payload !== null && payload.settings) setSettings(payload.settings);
+        });
+        void readSnapshot().then(next => { if (alive && next !== null) setSnapshot(next); });
+        return () => { alive = false; };
+      }, []);
+
+      const save = async patch => {
+        const next = { ...settings, ...patch };
+        setSettings(next);
+        const payload = await request('/settings', {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(next),
+        });
+        if (payload === null || !payload.settings) {
+          setError(t('settings.saveFailed'));
+          return;
+        }
+        setError('');
+        setSettings(payload.settings);
+      };
+
+      const refreshNow = async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+          const next = await request('/refresh', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+          if (next !== null) setSnapshot(next);
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      if (settings === null) {
+        return h('div', { className: 'ofm-balance-set' },
+          h('div', { className: 'ofm-balance-set-hint' }, t('settings.loading')));
+      }
+
+      const secs = typeof settings.autoRefreshSec === 'number' ? settings.autoRefreshSec : 60;
+      const isCustom = !REFRESH_CHOICES.includes(secs);
+      const rows = snapshot === null ? [] : (snapshot.channels ?? []);
+      const signedIn = rows.filter(row => row.loggedIn === true);
+      const hidden = Array.isArray(settings.hiddenChannels) ? settings.hiddenChannels : [];
+      const poller = snapshot === null || snapshot.poller === undefined ? null : snapshot.poller;
+      const stamp = snapshot === null ? '' : clockText(snapshot.at);
+
+      let pollerText = t('settings.poller.idle');
+      if (poller !== null) {
+        if (poller.state === 'polling') pollerText = t('settings.poller.polling');
+        else if (poller.state === 'stopped') pollerText = t('settings.poller.stopped');
+        else if (poller.state === 'backoff') {
+          pollerText = t('settings.poller.backoff', {
+            delay: Math.max(1, Math.round((poller.delayMs ?? 0) / 1000)),
+            reason: poller.error ?? '',
+          });
+        }
+      }
+
+      const toggle = (key, value) => { void save({ [key]: value }); };
+
+      const applyCustom = () => {
+        const parsed = Number.parseInt(draftSeconds, 10);
+        if (!Number.isFinite(parsed)) return;
+        void save({ autoRefreshSec: Math.min(3600, Math.max(15, parsed)) });
+        setDraftSeconds('');
+      };
+
+      return h('div', { className: 'ofm-balance-set' },
+        error === '' ? null : h('div', { className: 'ofm-balance-set-error' }, error),
+
+        h('div', { className: 'ofm-balance-set-group' },
+          h('div', { className: 'ofm-balance-set-legend' }, t('settings.refreshLegend')),
+          h('div', { className: 'ofm-balance-set-row' },
+            h('span', { className: 'ofm-balance-set-label' }, t('settings.autoRefresh')),
+            h('span', { className: 'ofm-balance-set-control' },
+              h('select', {
+                value: isCustom ? 'custom' : String(secs),
+                onChange: event => {
+                  const picked = event.target.value;
+                  if (picked === 'custom') { setDraftSeconds(String(Math.max(15, secs))); return; }
+                  void save({ autoRefreshSec: Number.parseInt(picked, 10) });
+                },
+              },
+              REFRESH_CHOICES.map(value => h('option', { key: value, value: String(value) },
+                value === 0 ? t('settings.off') : `${value} ${t('settings.seconds')}`)),
+              h('option', { value: 'custom' }, t('settings.custom'))),
+              isCustom || draftSeconds !== ''
+                ? h('span', { className: 'ofm-balance-set-control' },
+                  h('input', {
+                    type: 'number',
+                    min: 15,
+                    max: 3600,
+                    value: draftSeconds === '' ? String(secs) : draftSeconds,
+                    onChange: event => setDraftSeconds(event.target.value),
+                    onBlur: applyCustom,
+                    onKeyDown: event => { if (event.key === 'Enter') applyCustom(); },
+                  }),
+                  h('span', { className: 'ofm-balance-set-hint' }, t('settings.seconds')))
+                : null)),
+          h('div', { className: 'ofm-balance-set-row' },
+            h('span', { className: 'ofm-balance-set-label' },
+              stamp === '' ? t('settings.never') : t('settings.updatedAt', { time: stamp }),
+              h('span', { className: 'ofm-balance-set-hint' }, ` · ${pollerText}`)),
+            h('span', { className: 'ofm-balance-set-control' },
+              h('button', {
+                type: 'button',
+                className: 'ofm-balance-set-button',
+                onClick: refreshNow,
+                disabled: busy,
+              }, t('settings.refreshNow'))))),
+
+        h('div', { className: 'ofm-balance-set-group' },
+          h('div', { className: 'ofm-balance-set-legend' }, t('settings.displayLegend')),
+          [
+            ['showTimestamp', 'settings.showTimestamp'],
+            ['showUnits', 'settings.showUnits'],
+            ['showSpine', 'settings.showSpine'],
+            ['showFooter', 'settings.showFooter'],
+            ['redWhenSpent', 'settings.redWhenSpent'],
+          ].map(([key, label]) => h('label', { key, className: 'ofm-balance-set-row' },
+            h('span', { className: 'ofm-balance-set-label' }, t(label)),
+            h('span', { className: 'ofm-balance-set-control' },
+              h('input', {
+                type: 'checkbox',
+                checked: settings[key] !== false,
+                onChange: event => toggle(key, event.target.checked),
+              })))),
+          h('label', { className: 'ofm-balance-set-row' },
+            h('span', { className: 'ofm-balance-set-label' }, t('settings.chipDot')),
+            h('span', { className: 'ofm-balance-set-control' },
+              h('input', {
+                type: 'checkbox',
+                checked: settings.chipStyle === 'dot',
+                onChange: event => toggle('chipStyle', event.target.checked ? 'dot' : 'number'),
+              })))),
+
+        h('div', { className: 'ofm-balance-set-group' },
+          h('div', { className: 'ofm-balance-set-legend' }, t('settings.channelsLegend')),
+          h('label', { className: 'ofm-balance-set-row' },
+            h('span', { className: 'ofm-balance-set-label' }, t('settings.showSignedOut')),
+            h('span', { className: 'ofm-balance-set-control' },
+              h('input', {
+                type: 'checkbox',
+                checked: settings.showSignedOut === true,
+                onChange: event => toggle('showSignedOut', event.target.checked),
+              }))),
+          h('div', { className: 'ofm-balance-set-hint' }, t('settings.hiddenHint')),
+          signedIn.length === 0
+            ? h('div', { className: 'ofm-balance-set-hint' }, t('settings.noChannels'))
+            : h('div', { className: 'ofm-balance-set-channels' }, signedIn.map(row => h('label', {
+              key: row.id,
+              className: 'ofm-balance-set-row',
+            },
+            h('span', { className: 'ofm-balance-set-label' }, row.name),
+            h('span', { className: 'ofm-balance-set-control' },
+              h('input', {
+                type: 'checkbox',
+                checked: !hidden.includes(row.id),
+                onChange: event => {
+                  const next = event.target.checked
+                    ? hidden.filter(id => id !== row.id)
+                    : [...hidden, row.id];
+                  void save({ hiddenChannels: next });
+                },
+              })))))),
+
+        h('div', { className: 'ofm-balance-set-group' },
+          h('div', { className: 'ofm-balance-set-row' },
+            h('span', { className: 'ofm-balance-set-label' }),
+            h('span', { className: 'ofm-balance-set-control' },
+              h('button', {
+                type: 'button',
+                className: 'ofm-balance-set-button',
+                onClick: () => { void save({ ...DEFAULT_CLIENT_SETTINGS }); },
+              }, t('settings.reset'))))));
+    }
+
     return {
       inject: ['slots'],
       apply(ctx) {
@@ -571,6 +850,14 @@ window.__ModuleLoader__.load({
           channelIds: CHANNEL_IDS,
           defaultSettings: DEFAULT_CLIENT_SETTINGS,
         }))));
+
+        ctx.slots.inject('settings.section', () => ctx.slots.register({
+          name: 'settings.section',
+          id: 'our-free-model-balance',
+          order: 36,
+          label: () => t('settings.pageLabel'),
+        }, props => h(Boundary, null, h(SettingsPage, { ...props, t }))));
+
         return disposeStyles;
       },
     };
