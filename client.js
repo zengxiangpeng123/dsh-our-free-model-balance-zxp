@@ -28,19 +28,18 @@ window.__ModuleLoader__.load({
     const STYLE_ID = 'ofm-balance-styles';
 
     /**
-     * An inventory, not a catalogue.
+     * A readout, not a dashboard.
      *
-     * Only channels this person is actually signed into appear, so the panel
-     * is what they own rather than what exists — usually four to six rows
-     * instead of ten. Within it, exactly one colour is allowed to alarm: a
-     * filled red tag says a channel is used up, and it is the only saturated
-     * thing on the surface. Everything with fuel stays quiet, the figure set
-     * large and tabular so the column compares down the page, and the current
-     * channel — the one the composer's model belongs to — is the only row
-     * wearing its vendor's colour.
+     * Only channels this person is actually signed into appear, so the panel is
+     * what they own rather than what exists. Within it, exactly one colour is
+     * allowed to alarm: a filled red tag says a channel is used up, and it is
+     * the only saturated thing on the surface. Everything with fuel stays quiet,
+     * the figure set large and tabular so the column compares down the page, and
+     * the current channel — the one the composer's model belongs to — is the
+     * only row wearing its vendor's colour.
      *
-     * Deliberately absent: per-row cards, gradient decoration, ALL-CAPS
-     * tracked labels, dotted meta strings, a rule under every row.
+     * Deliberately absent: per-row cards, gradient decoration, ALL-CAPS tracked
+     * labels, dotted meta strings, a rule under every row.
      */
     const CSS = `
       .ofm-balance-wrap { position: relative; display: inline-flex; }
@@ -66,8 +65,8 @@ window.__ModuleLoader__.load({
       .ofm-balance-chip[data-spent="true"] { border-color: rgba(217, 45, 51, .55); }
 
       /* The one alarm in the whole surface: a filled tag, so its contrast is
-         guaranteed on any theme instead of depending on a red text colour
-         that only works on light backgrounds. */
+         guaranteed on any theme instead of depending on a red text colour that
+         only works on light backgrounds. */
       .ofm-balance-tag {
         flex: 0 0 auto; font-size: 11px; font-weight: 700; line-height: 1;
         padding: 3px 6px; border-radius: 5px;
@@ -97,6 +96,7 @@ window.__ModuleLoader__.load({
         flex: 0 0 auto; font-size: 10px; opacity: .5;
         font-variant-numeric: tabular-nums;
       }
+      .ofm-balance-stamp[data-stale="true"] { opacity: .32; }
       .ofm-balance-refresh {
         flex: 0 0 auto; width: 20px; height: 20px; padding: 0;
         display: inline-flex; align-items: center; justify-content: center;
@@ -115,6 +115,10 @@ window.__ModuleLoader__.load({
         .ofm-balance-refresh[data-busy="true"] { animation: none; opacity: .45; }
       }
 
+      .ofm-balance-note {
+        padding: 7px 13px 8px; font-size: 10.5px; line-height: 1.5; opacity: .7;
+      }
+
       .ofm-balance-list { padding: 5px 0 4px; }
       .ofm-balance-row {
         display: flex; align-items: baseline; gap: 8px;
@@ -131,9 +135,7 @@ window.__ModuleLoader__.load({
         text-overflow: ellipsis; white-space: nowrap;
         font-size: 11.5px; opacity: .92;
       }
-      .ofm-balance-unit {
-        flex: 0 0 auto; font-size: 10px; opacity: .5;
-      }
+      .ofm-balance-unit { flex: 0 0 auto; font-size: 10px; opacity: .5; }
       .ofm-balance-figure {
         flex: 0 0 auto; font-size: 15px; font-weight: 600;
         font-variant-numeric: tabular-nums; letter-spacing: -.01em;
@@ -144,9 +146,8 @@ window.__ModuleLoader__.load({
         font-variant-numeric: tabular-nums;
       }
 
-      /* Used up: a red wash, a red leading edge, and the tag standing where
-         the figure would be. The name keeps normal contrast so it stays
-         legible; the alarm is carried by the wash, the edge and the tag. */
+      /* Used up: a red wash, a red leading edge, and the tag standing where the
+         figure would be. The name keeps normal contrast so it stays legible. */
       .ofm-balance-row[data-spent="true"] {
         background: rgba(217, 45, 51, .10);
         background: color-mix(in srgb, #D92D33 10%, transparent);
@@ -156,24 +157,42 @@ window.__ModuleLoader__.load({
         background: rgba(217, 45, 51, .16);
         background: color-mix(in srgb, #D92D33 16%, transparent);
       }
+      .ofm-balance-spent-word { flex: 0 0 auto; font-size: 11px; font-weight: 700; opacity: .8; }
 
       .ofm-balance-emptywrap { padding: 14px 13px 16px; }
       .ofm-balance-emptyline { font-size: 11.5px; }
       .ofm-balance-emptyhint { margin-top: 4px; font-size: 10px; opacity: .5; line-height: 1.5; }
 
       .ofm-balance-foot { padding: 8px 13px 10px; font-size: 10px; opacity: .55; }
+      .ofm-balance-foot-spent { opacity: .55; }
     `;
 
     // Visible copy lives in dictionaries, not inline in the component.
     const NS = 'our-free-model-balance-zxp';
 
     // The ten channel ids, mirrored from the host table. A model whose provider
-    // is not in this set has no channel balance and gets no chip at all, which
-    // is why a New API model must not show one.
+    // is not in this set has no channel balance and gets no chip at all.
     const CHANNEL_IDS = new Set([
       'lobsterai', 'qoder', 'qodercn', 'trae', 'cline',
       'loomy', 'raccoon', 'minimax', 'zcode', 'gemini',
     ]);
+
+    /**
+     * Mirrors `DEFAULT_SETTINGS` in `src/settings.js`. Only used until the first
+     * snapshot arrives, so the chip can paint something before the host answers;
+     * the host remains the single source of truth for these values.
+     */
+    const DEFAULT_CLIENT_SETTINGS = Object.freeze({
+      autoRefreshSec: 60,
+      showTimestamp: true,
+      showUnits: true,
+      showSpine: true,
+      showFooter: true,
+      showSignedOut: false,
+      redWhenSpent: true,
+      chipStyle: 'number',
+      hiddenChannels: [],
+    });
 
     const DICT = {
       zh: {
@@ -197,6 +216,7 @@ window.__ModuleLoader__.load({
         'foot.join': '，',
         'empty.none': '没有已登录的渠道',
         'empty.hint': '登录 Our Free Model 的渠道后出现在这里',
+        'note.stale': '下面的数字来自上一次成功查询，可能已经不准（{reason}）',
       },
       en: {
         'panel.title': 'Channel balances',
@@ -219,10 +239,11 @@ window.__ModuleLoader__.load({
         'foot.join': ', ',
         'empty.none': 'No channel is signed in',
         'empty.hint': 'Sign in to a channel in Our Free Model and it appears here',
+        'note.stale': 'These numbers come from the last successful query and may be out of date ({reason})',
       },
     };
 
-    /** Substitute {name} placeholders; the dictionaries are flat, so this is all we need. */
+    /** Substitute {name} placeholders; the dictionaries are flat. */
     function makeTranslator(dict) {
       return (key, values) => {
         const template = dict[key] ?? key;
@@ -242,7 +263,7 @@ window.__ModuleLoader__.load({
       return () => tag.remove();
     }
 
-    /** Used up is the one status allowed to shout; everything else is quiet. */
+    /** Used up is the one status allowed to shout. */
     function isSpent(row) {
       return row.state === 'ok' && row.value === 0;
     }
@@ -263,33 +284,7 @@ window.__ModuleLoader__.load({
       return t('row.failed', { ...base, reason: row.reason || t('state.failed') });
     }
 
-    /** Everything the chip needs: its vendor mark, its figure, and its tooltip. */
-    function chipParts(allRows, channelId, t) {
-      const row = allRows.find(candidate => candidate.id === channelId);
-      if (row === undefined) return { mark: '#8A8F98', figure: '—', unit: '', spent: false, title: '' };
-      if (isSpent(row)) {
-        return { mark: '#D92D33', figure: '', unit: '', spent: true, title: rowSentence(row, t) };
-      }
-      if (hasFuel(row)) {
-        return {
-          mark: row.accent,
-          figure: `${row.amount}${row.partial ? '+?' : ''}`,
-          unit: row.unitShort,
-          spent: false,
-          title: rowSentence(row, t),
-        };
-      }
-      // Signed in but unreadable: a word, never a zero, so "unknown" can never
-      // be mistaken for "empty".
-      const word = row.state === 'empty' ? t('state.empty') : row.state === 'unknown' ? t('state.unknown') : t('state.failed');
-      return { mark: row.accent, figure: word, unit: '', spent: false, title: rowSentence(row, t) };
-    }
-
-    /**
-     * The one-line summary. Only channels that are signed in are counted —
-     * the panel itself hides the rest — and "used up" never counts as
-     * available, which is the mistake the footer made before.
-     */
+    /** The one-line summary over the rows actually shown. */
     function summaryText(visible, t) {
       const funded = visible.filter(hasFuel).length;
       const spent = visible.filter(isSpent).length;
@@ -301,74 +296,37 @@ window.__ModuleLoader__.load({
       return parts.join(t('foot.join'));
     }
 
-    /**
-     * The wall clock of the last fetch. The panel is deliberately cached until
-     * the user asks again, so how stale the numbers are is real information.
-     */
-    function clockText(date) {
-      if (date === null) return '';
+    /** The wall clock of the last successful poll. */
+    function clockText(at) {
+      if (typeof at !== 'number' || at <= 0) return '';
+      const date = new Date(at);
       const pad = value => String(value).padStart(2, '0');
       return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
-    /**
-     * Ask the pack for every channel's balances, then let the host turn the
-     * replies into rows. The pack's RPC is reached through the shell's
-     * `connection` service — read opportunistically, exactly as OFM's own
-     * channel page does it, because a shell without that service must still
-     * render this panel rather than stall the plugin forever.
-     */
-    async function loadRows(readConnection, sessionId, signal, channelsRef) {
-      const connection = readConnection();
-      const rpc = connection && connection.rpc ? connection.rpc : undefined;
-      // The channel table is static for the life of the package: ask once.
-      if (channelsRef.current === null) {
-        channelsRef.current = await fetch(`${ENDPOINT}`, { signal })
-          .then(response => (response.ok ? response.json() : null))
-          .then(payload => (payload && Array.isArray(payload.channels) ? payload.channels : []))
-          .catch(() => []);
+    /** One request, one JSON answer; failures are reported as null, never thrown. */
+    async function request(path, init) {
+      try {
+        const response = await fetch(`${ENDPOINT}${path}`, init);
+        if (!response.ok) return null;
+        return await response.json();
+      } catch {
+        return null;
       }
-      const channels = channelsRef.current;
-
-      const raw = {};
-      if (rpc === undefined || typeof rpc.call !== 'function') {
-        for (const channel of channels) {
-          raw[channel.id] = { ok: false, error: { code: 'no-connection', message: '当前界面不提供渠道连接' } };
-        }
-      } else {
-        await Promise.all(channels.map(async channel => {
-          try {
-            raw[channel.id] = await rpc.call('/api', 'channel-pack', {
-              method: 'credits.balances',
-              payload: { provider: channel.id },
-            }, signal);
-          } catch (error) {
-            raw[channel.id] = { ok: false, error: { code: 'rpc-failed', message: String((error && error.message) || error) } };
-          }
-        }));
-      }
-
-      const response = await fetch(`${ENDPOINT}/rows`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId, raw }),
-        signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      return Array.isArray(payload && payload.rows) ? payload.rows : [];
     }
+
+    const readSnapshot = signal => request('/snapshot', { signal });
+    const watchNow = () => request('/watch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    const refreshNow = () => request('/refresh', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
 
     /**
      * Read the session's current model selection from the projection the
      * composer's own model seat reads.
      *
-     * The selection is NOT `agent.options` — that is captured when the agent is
-     * created and does not follow a later switch. `selectModel` appends a
-     * `model/selection` event and the host projects it to the `modelSelection`
-     * key, whose `next` is the choice awaiting the next request and whose
-     * `lastUsed` is the previous one. `next ?? lastUsed` is therefore what the
-     * composer is showing right now.
+     * The selection is NOT `agent.options` (captured at agent creation) and not
+     * `agentDefaultModel` (the default for new sessions). `selectModel` appends
+     * a `model/selection` event, projected to the `modelSelection` key, whose
+     * `next` awaits the next request and whose `lastUsed` is the previous one.
      */
     function readSelection(projection) {
       if (projection === undefined || projection === null) return null;
@@ -379,55 +337,62 @@ window.__ModuleLoader__.load({
 
     function Chip(props) {
       const [open, setOpen] = React.useState(false);
-      const [rows, setRows] = React.useState([]);
+      const [snapshot, setSnapshot] = React.useState(null);
       const [busy, setBusy] = React.useState(false);
-      const [fetchedAt, setFetchedAt] = React.useState(null);
-      const sessionId = props.sessionId;
       const t = props.t;
       const wrapRef = React.useRef(null);
 
-      // Reactive, not a one-shot: switching the model re-renders this chip, so
-      // its visibility and its channel follow the composer without a reload.
       const useProjection = props.useProjection;
       const projection = typeof useProjection === 'function' ? useProjection('modelSelection') : undefined;
       const selection = readSelection(projection);
       const provider = selection === null ? null : selection.provider;
-      // A model whose provider is not one of the free channels has no balance
-      // to show; that includes every New API model, so no chip appears.
       const channelId = provider !== null && props.channelIds.has(provider) ? provider : null;
 
-      const channelsRef = React.useRef(null);
+      const settings = (snapshot !== null && snapshot.settings !== undefined && snapshot.settings !== null)
+        ? snapshot.settings
+        : props.defaultSettings;
+      const autoRefreshSec = typeof settings.autoRefreshSec === 'number' ? settings.autoRefreshSec : 60;
 
-      const load = React.useCallback(async () => {
-        setBusy(true);
-        const controller = new AbortController();
-        try {
-          const next = await loadRows(props.readConnection, sessionId, controller.signal, channelsRef);
-          setRows(next);
-          setFetchedAt(new Date());
-        } catch {
-          setRows([]);
-        } finally {
-          setBusy(false);
-        }
-      }, [props.readConnection, sessionId]);
+      // Report presence and take whatever the host already has. The heartbeat
+      // exists for exactly one reason: the host stops polling when nobody is
+      // watching. It never fetches balances itself.
+      const beat = React.useCallback(async () => {
+        const next = await watchNow();
+        if (next !== null) setSnapshot(next);
+      }, []);
 
-      const toggle = React.useCallback(() => { setOpen(previous => !previous); }, []);
-
-      // One fetch per page life, then it stays put. The rows cover every
-      // channel at once, so switching the model only re-reads this cache: the
-      // rule is "show the numbers by yourself, but never ask again unless I
-      // press refresh".
-      const fetchedOnce = React.useRef(false);
       React.useEffect(() => {
-        if (channelId !== null && fetchedOnce.current === false) {
-          fetchedOnce.current = true;
-          load();
-        }
-      }, [channelId, load]);
+        if (channelId === null) return undefined;
+        let alive = true;
+        let timer = null;
+        const arm = () => {
+          const seconds = Math.min(60, autoRefreshSec > 0 ? autoRefreshSec : 60);
+          timer = setTimeout(() => {
+            if (document.visibilityState === 'hidden') return;
+            void beat().then(() => { if (alive) arm(); });
+          }, Math.max(5, seconds) * 1000);
+        };
+        const onVisible = () => { if (document.visibilityState === 'visible') void beat(); };
+        document.addEventListener('visibilitychange', onVisible);
+        void beat().then(() => { if (alive) arm(); });
+        return () => {
+          alive = false;
+          if (timer !== null) clearTimeout(timer);
+          document.removeEventListener('visibilitychange', onVisible);
+        };
+      }, [channelId, autoRefreshSec, beat]);
 
-      // Clicking anywhere outside closes; Escape closes. Neither refetches,
-      // and focus is not stolen, so typing continues uninterrupted.
+      // While the host is mid-round, re-read the snapshot every two seconds.
+      // These are local reads of a cache — they cost the upstream nothing.
+      React.useEffect(() => {
+        if (snapshot === null || snapshot.poller === undefined || snapshot.poller.state !== 'polling') return undefined;
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+          void readSnapshot(controller.signal).then(next => { if (next !== null) setSnapshot(next); });
+        }, 2000);
+        return () => { controller.abort(); clearTimeout(timer); };
+      }, [snapshot]);
+
       React.useEffect(() => {
         if (!open || typeof document === 'undefined') return undefined;
         const onPointerDown = event => {
@@ -445,21 +410,37 @@ window.__ModuleLoader__.load({
 
       if (channelId === null) return null;
 
-      const chip = chipParts(rows, channelId, t);
-      const stamp = clockText(fetchedAt);
+      const rows = snapshot === null ? [] : (snapshot.channels ?? []);
+      const byId = rows.find(row => row.id === channelId);
+      const spending = byId !== undefined && isSpent(byId);
+      const errorNote = (snapshot !== null && snapshot.poller !== undefined && typeof snapshot.poller.error === 'string')
+        ? snapshot.poller.error
+        : '';
 
-      // The panel is an inventory: a channel with no account is simply not part
-      // of it. A channel that IS signed in but unreadable still appears, because
-      // hiding it would make it look like it had vanished.
-      const visible = rows.filter(row => row.state !== 'empty');
+      // The panel is an inventory: a channel with no account is not part of it
+      // unless the user asked to see those too. A channel that IS signed in but
+      // unreadable still appears — hiding it would make it look vanished.
+      const hidden = Array.isArray(settings.hiddenChannels) ? settings.hiddenChannels : [];
+      const visible = rows.filter(row => !hidden.includes(row.id) && (row.loggedIn === true || settings.showSignedOut === true));
+
+      const chipFigure = byId === undefined
+        ? '—'
+        : spending
+          ? t('state.spent')
+          : hasFuel(byId)
+            ? `${byId.amount}${byId.partial ? '+?' : ''}`
+            : (byId.state === 'empty' ? t('state.empty') : byId.state === 'unknown' ? t('state.unknown') : t('state.failed'));
+      const chipUnit = (byId !== undefined && hasFuel(byId) && settings.showUnits !== false) ? byId.unitShort : '';
+      const chipMark = byId === undefined ? '#8A8F98' : (spending ? '#D92D33' : byId.accent);
+      const stamp = snapshot === null ? '' : clockText(snapshot.at);
 
       let body;
-      if (rows.length === 0) {
+      if (snapshot === null) {
         body = h('div', { className: 'ofm-balance-emptywrap' },
-          h('div', { className: 'ofm-balance-emptyline' }, busy ? t('panel.loading') : t('panel.none')));
+          h('div', { className: 'ofm-balance-emptyline' }, t('panel.loading')));
       } else if (visible.length === 0) {
         body = h('div', { className: 'ofm-balance-emptywrap' },
-          h('div', { className: 'ofm-balance-emptyline' }, t('empty.none')),
+          h('div', { className: 'ofm-balance-emptyline' }, rows.length === 0 ? t('panel.none') : t('empty.none')),
           h('div', { className: 'ofm-balance-emptyhint' }, t('empty.hint')));
       } else {
         body = h('div', { className: 'ofm-balance-list' }, visible.map(row => {
@@ -467,27 +448,40 @@ window.__ModuleLoader__.load({
           const current = row.id === channelId && !spent;
           const showFigure = hasFuel(row);
           const word = row.state === 'unknown' ? t('state.unknown') : t('state.failed');
+          const unit = (showFigure && settings.showUnits !== false)
+            ? h('span', { className: 'ofm-balance-unit' }, row.unitShort)
+            : null;
+          let tail;
+          if (spent) {
+            tail = settings.redWhenSpent === false
+              ? h('span', { className: 'ofm-balance-spent-word' }, t('state.spent'))
+              : h('span', { className: 'ofm-balance-tag' }, t('state.spent'));
+          } else if (showFigure) {
+            tail = h('span', { className: 'ofm-balance-figure' }, `${row.amount}${row.partial ? '+?' : ''}`);
+          } else {
+            tail = h('span', { className: 'ofm-balance-quiet' }, word);
+          }
           return h('div', {
             key: row.id,
             className: 'ofm-balance-row',
             'data-current': current ? 'true' : 'false',
-            'data-spent': spent ? 'true' : 'false',
+            'data-spent': spent && settings.redWhenSpent !== false ? 'true' : 'false',
             style: { '--ofm-row-mark': row.accent },
             title: rowSentence(row, t),
           },
           h('span', {
             className: 'ofm-balance-spine',
-            'data-on': current ? 'true' : 'false',
+            'data-on': current && settings.showSpine !== false ? 'true' : 'false',
           }),
           h('span', { className: 'ofm-balance-name' }, row.name),
-          showFigure ? h('span', { className: 'ofm-balance-unit' }, row.unitShort) : null,
-          spent
-            ? h('span', { className: 'ofm-balance-tag' }, t('state.spent'))
-            : (showFigure
-              ? h('span', { className: 'ofm-balance-figure' }, `${row.amount}${row.partial ? '+?' : ''}`)
-              : h('span', { className: 'ofm-balance-quiet' }, word)));
+          unit,
+          tail);
         }));
       }
+
+      const note = snapshot !== null && snapshot.stale === true
+        ? h('div', { className: 'ofm-balance-note' }, t('note.stale', { reason: errorNote === '' ? t('state.failed') : errorNote }))
+        : (errorNote === '' || visible.length === 0 ? null : h('div', { className: 'ofm-balance-note' }, errorNote));
 
       const panel = h('div', {
         className: 'ofm-balance-panel',
@@ -496,8 +490,9 @@ window.__ModuleLoader__.load({
       },
       h('div', { className: 'ofm-balance-head' },
         h('span', { className: 'ofm-balance-title' }, t('panel.title')),
-        stamp === '' ? null : h('span', {
+        (stamp === '' || settings.showTimestamp === false) ? null : h('span', {
           className: 'ofm-balance-stamp',
+          'data-stale': snapshot !== null && snapshot.stale === true ? 'true' : 'false',
           title: t('panel.stamp', { time: stamp }),
         }, stamp),
         h('button', {
@@ -506,48 +501,45 @@ window.__ModuleLoader__.load({
           title: t('panel.refresh'),
           'aria-label': t('panel.refresh'),
           'data-busy': busy ? 'true' : 'false',
-          // Never disabled: a disabled button shows no spin and reads as dead.
-          onClick: () => { if (!busy) load(); },
+          onClick: async () => {
+            if (busy) return;
+            setBusy(true);
+            try {
+              const next = await refreshNow();
+              if (next !== null) setSnapshot(next);
+            } finally {
+              setBusy(false);
+            }
+          },
         }, '↻')),
+      note,
       body,
-      visible.length === 0 ? null : h('div', { className: 'ofm-balance-foot' }, summaryText(visible, t)));
+      (visible.length === 0 || settings.showFooter === false)
+        ? null
+        : h('div', { className: 'ofm-balance-foot' }, summaryText(visible, t)));
 
       return h('span', { className: 'ofm-balance-wrap', ref: wrapRef },
         h('button', {
           type: 'button',
           className: 'ofm-balance-chip',
-          title: chip.title,
+          title: byId === undefined ? '' : rowSentence(byId, t),
           'data-channel': channelId,
-          'data-spent': chip.spent ? 'true' : 'false',
+          'data-spent': spending && settings.redWhenSpent !== false ? 'true' : 'false',
           'aria-expanded': open ? 'true' : 'false',
-          style: { '--ofm-mark': chip.mark },
-          onClick: toggle,
+          style: { '--ofm-mark': chipMark },
+          onClick: () => setOpen(previous => !previous),
         },
         h('span', { className: 'ofm-balance-mark' }),
-        chip.spent
-          ? h('span', { className: 'ofm-balance-tag' }, t('state.spent'))
-          : h('span', { className: 'ofm-balance-chip-figure' }, busy && rows.length === 0 ? '…' : chip.figure),
-        chip.unit === '' ? null : h('span', { className: 'ofm-balance-chip-unit' }, chip.unit)),
+        settings.chipStyle === 'dot' ? null : h('span', { className: 'ofm-balance-chip-figure' }, chipFigure),
+        chipUnit === '' ? null : h('span', { className: 'ofm-balance-chip-unit' }, chipUnit)),
         open ? panel : null);
     }
 
     return {
       inject: ['slots'],
       apply(ctx) {
-        const readConnection = () => {
-          try {
-            const viaGet = typeof ctx.get === 'function' ? ctx.get('connection') : undefined;
-            if (viaGet !== undefined && viaGet !== null) return viaGet;
-          } catch { /* fall through */ }
-          try { return ctx.connection ?? null; } catch { return null; }
-        };
         const disposeStyles = ctx.effect(injectStyles, 'our-free-model-balance-zxp: styles');
 
-        // The locale service is read optionally rather than injected: a shell
-        // without it must still draw the chip. Registration failure must not
-        // degrade the panel to raw keys either — a namespace with no dictionary
-        // makes `bind` echo the key back — so an unregistered namespace falls
-        // through to the built-in Chinese dictionary below.
         let t = makeTranslator(DICT.zh);
         const builtin = makeTranslator(DICT.zh);
         try {
@@ -558,8 +550,6 @@ window.__ModuleLoader__.load({
               try {
                 return locale.register(NS, { zh: DICT.zh, en: DICT.en });
               } catch {
-                // A shell shipping more built-in locales than this dictionary
-                // covers; register just the active one rather than none.
                 try { return locale.register(NS, 'zh', DICT.zh); } catch { return undefined; }
               }
             }, 'our-free-model-balance-zxp: dictionaries');
@@ -575,7 +565,12 @@ window.__ModuleLoader__.load({
           name: 'conversation.input.left',
           id: 'our-free-model-balance-zxp',
           order: 40,
-        }, props => h(Boundary, null, h(Chip, { ...props, readConnection, t, channelIds: CHANNEL_IDS }))));
+        }, props => h(Boundary, null, h(Chip, {
+          ...props,
+          t,
+          channelIds: CHANNEL_IDS,
+          defaultSettings: DEFAULT_CLIENT_SETTINGS,
+        }))));
         return disposeStyles;
       },
     };
