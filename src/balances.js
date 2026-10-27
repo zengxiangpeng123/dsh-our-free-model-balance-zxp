@@ -28,6 +28,21 @@ function blank(id, name, unit) {
 }
 
 /**
+ * The number to show for one account, or null when the reply carries none.
+ *
+ * The pack answers in two shapes: a bare number, and a structured
+ * `{ total, packages, expiredTotal }` — the latter is what every logged-in
+ * channel actually returns (Loomy, TRAE, Raccoon, MiniMax, ZCode). OFM's own
+ * panel reads `balance.total`, so this does too. Reading only the numeric shape
+ * is what made every signed-in channel report "no balance returned".
+ */
+function balanceTotal(balance) {
+  if (typeof balance === 'number' && Number.isFinite(balance)) return balance
+  if (balance !== null && typeof balance === 'object' && Number.isFinite(balance.total)) return balance.total
+  return null
+}
+
+/**
  * @param {string} channelId
  * @param {{ ok?: boolean, value?: { accounts?: any[] }, error?: { message?: string } }} envelope
  */
@@ -55,8 +70,9 @@ export function normalizeRow(channelId, envelope) {
   let partial = false
   let reason = ''
   for (const account of accounts) {
-    if (typeof account?.balance === 'number' && Number.isFinite(account.balance)) {
-      values.push(account.balance)
+    const value = balanceTotal(account?.balance)
+    if (value !== null) {
+      values.push(value)
       continue
     }
     partial = true

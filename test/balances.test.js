@@ -54,6 +54,43 @@ test('不认识的渠道 → unavailable，不猜数字', () => {
   assert.equal(row.reason, '未知渠道')
 })
 
+test('余额是结构化对象时取 total', () => {
+  // 实测形状：Loomy / TRAE / Raccoon / MiniMax / ZCode 返回的是
+  // { total, packages, expiredTotal }，不是数字。OFM 自己的面板也读 total。
+  const row = normalizeRow('loomy', env([{
+    accountId: 'loomy-696e4af0',
+    nickname: '夜平静',
+    balance: { total: 573, expiredTotal: 0, packages: [{ name: '每日赠送', remaining: 573 }] },
+  }]))
+  assert.equal(row.state, 'ok')
+  assert.equal(row.value, 573)
+})
+
+test('多个结构化余额取最小 total', () => {
+  const row = normalizeRow('trae', env([
+    { accountId: 'a', balance: { total: 356.2848 } },
+    { accountId: 'b', balance: { total: 12 } },
+  ]))
+  assert.equal(row.value, 12)
+  assert.equal(row.partial, false)
+})
+
+test('结构化余额里 total 不是有限数时算查不到', () => {
+  const row = normalizeRow('zcode', env([{ accountId: 'a', balance: { total: null }, error: '无 total' }]))
+  assert.equal(row.state, 'unknown')
+  assert.equal(row.value, null)
+})
+
+test('结构化余额与数字余额混用时不误判', () => {
+  const row = normalizeRow('raccoon', env([
+    { accountId: 'a', balance: { total: 1864 } },
+    { accountId: 'b', balance: null, error: '凭据未配置' },
+  ]))
+  assert.equal(row.state, 'ok')
+  assert.equal(row.value, 1864)
+  assert.equal(row.partial, true)
+})
+
 test('没有账号可读时保留原因，供面板显示', () => {
   const row = normalizeRow('loomy', env([{ accountId: 'a', balance: null, error: '积分查询失败（凭据失效或响应异常）' }]))
   assert.equal(row.reason, '积分查询失败（凭据失效或响应异常）')
