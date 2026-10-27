@@ -28,19 +28,19 @@ window.__ModuleLoader__.load({
     const STYLE_ID = 'ofm-balance-styles';
 
     /**
-     * A readout, not a dashboard.
+     * An inventory, not a catalogue.
      *
-     * The subject is ten free-tier channels with different units, watched by
-     * one person who wants to know which tanks still have gas. So the panel is
-     * a ledger: names left, figures right in tabular numerals so magnitudes
-     * compare down the column, and one reserved spine slot that only the
-     * channel the current model is actually using fills in. That spine — and
-     * its echo in the chip — is the design's only loud element; everything
-     * else stays quiet, and the host's own surface, border and text tokens do
-     * the rest so the popover belongs to whatever theme it is dropped into.
+     * Only channels this person is actually signed into appear, so the panel
+     * is what they own rather than what exists — usually four to six rows
+     * instead of ten. Within it, exactly one colour is allowed to alarm: a
+     * filled red tag says a channel is used up, and it is the only saturated
+     * thing on the surface. Everything with fuel stays quiet, the figure set
+     * large and tabular so the column compares down the page, and the current
+     * channel — the one the composer's model belongs to — is the only row
+     * wearing its vendor's colour.
      *
      * Deliberately absent: per-row cards, gradient decoration, ALL-CAPS
-     * tracked labels, dotted meta strings, and a rule under every row.
+     * tracked labels, dotted meta strings, a rule under every row.
      */
     const CSS = `
       .ofm-balance-wrap { position: relative; display: inline-flex; }
@@ -61,13 +61,24 @@ window.__ModuleLoader__.load({
         width: 6px; height: 6px; border-radius: 2px; flex: 0 0 auto;
         background: var(--ofm-mark, #8A8F98);
       }
-      .ofm-balance-chip-figure { font-variant-numeric: tabular-nums; }
+      .ofm-balance-chip-figure { font-variant-numeric: tabular-nums; font-weight: 600; }
       .ofm-balance-chip-unit { opacity: .6; }
+      .ofm-balance-chip[data-spent="true"] { border-color: rgba(217, 45, 51, .55); }
+
+      /* The one alarm in the whole surface: a filled tag, so its contrast is
+         guaranteed on any theme instead of depending on a red text colour
+         that only works on light backgrounds. */
+      .ofm-balance-tag {
+        flex: 0 0 auto; font-size: 11px; font-weight: 700; line-height: 1;
+        padding: 3px 6px; border-radius: 5px;
+        background: #D92D33; color: #FFFFFF;
+      }
+      .ofm-balance-chip .ofm-balance-tag { font-size: 10px; padding: 2px 5px; }
 
       .ofm-balance-panel {
         position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 40;
-        box-sizing: border-box; width: 292px;
-        max-width: min(292px, calc(100vw - 28px));
+        box-sizing: border-box; width: 300px;
+        max-width: min(300px, calc(100vw - 28px));
         border-radius: 12px; overflow: hidden;
         border: 1px solid var(--dsw-alias-border-l2, rgba(128, 132, 140, .34));
         background: var(--dsw-alias-bg-layer-1, Canvas);
@@ -78,12 +89,12 @@ window.__ModuleLoader__.load({
 
       .ofm-balance-head {
         display: flex; align-items: center; gap: 8px;
-        padding: 9px 8px 8px 12px;
-        border-bottom: 1px solid var(--ofm-hair, rgba(128, 132, 140, .22));
+        padding: 9px 8px 8px 13px;
+        border-bottom: 1px solid var(--ofm-hair, rgba(128, 132, 140, .20));
       }
       .ofm-balance-title { flex: 1; min-width: 0; font-size: 11.5px; }
       .ofm-balance-stamp {
-        flex: 0 0 auto; font-size: 10px; opacity: .55;
+        flex: 0 0 auto; font-size: 10px; opacity: .5;
         font-variant-numeric: tabular-nums;
       }
       .ofm-balance-refresh {
@@ -104,36 +115,53 @@ window.__ModuleLoader__.load({
         .ofm-balance-refresh[data-busy="true"] { animation: none; opacity: .45; }
       }
 
-      .ofm-balance-list { padding: 4px 0; }
+      .ofm-balance-list { padding: 5px 0 4px; }
       .ofm-balance-row {
-        display: flex; align-items: center; gap: 7px;
-        padding: 4px 12px 4px 0;
+        display: flex; align-items: baseline; gap: 8px;
+        padding: 5px 13px 5px 0;
       }
-      .ofm-balance-row:hover { background: rgba(128, 132, 140, .10); }
-      .ofm-balance-row[data-current="true"] {
-        background: rgba(128, 132, 140, .12);
-        background: color-mix(in srgb, var(--ofm-row-mark, #4C7DFF) 13%, transparent);
-      }
+      .ofm-balance-row:hover { background: rgba(128, 132, 140, .09); }
       .ofm-balance-spine {
         flex: 0 0 3px; width: 3px; height: 15px; border-radius: 0 2px 2px 0;
-        background: var(--ofm-row-mark, #8A8F98); opacity: 0;
+        align-self: center; background: var(--ofm-row-mark, #8A8F98); opacity: 0;
       }
       .ofm-balance-spine[data-on="true"] { opacity: 1; }
       .ofm-balance-name {
         flex: 1 1 auto; min-width: 0; overflow: hidden;
         text-overflow: ellipsis; white-space: nowrap;
+        font-size: 11.5px; opacity: .92;
       }
-      .ofm-balance-row[data-current="true"] .ofm-balance-name { font-weight: 600; }
-      .ofm-balance-unit { flex: 0 0 auto; font-size: 10px; opacity: .5; }
+      .ofm-balance-unit {
+        flex: 0 0 auto; font-size: 10px; opacity: .5;
+      }
       .ofm-balance-figure {
-        flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums;
+        flex: 0 0 auto; font-size: 15px; font-weight: 600;
+        font-variant-numeric: tabular-nums; letter-spacing: -.01em;
       }
+      .ofm-balance-row[data-current="true"] .ofm-balance-figure { color: var(--ofm-row-mark); }
       .ofm-balance-quiet {
-        flex: 0 0 auto; font-size: 11px; opacity: .48;
+        flex: 0 0 auto; font-size: 11px; opacity: .45;
         font-variant-numeric: tabular-nums;
       }
 
-      .ofm-balance-foot { padding: 7px 12px 9px; font-size: 10px; opacity: .6; }
+      /* Used up: a red wash, a red leading edge, and the tag standing where
+         the figure would be. The name keeps normal contrast so it stays
+         legible; the alarm is carried by the wash, the edge and the tag. */
+      .ofm-balance-row[data-spent="true"] {
+        background: rgba(217, 45, 51, .10);
+        background: color-mix(in srgb, #D92D33 10%, transparent);
+        box-shadow: inset 3px 0 0 0 #D92D33;
+      }
+      .ofm-balance-row[data-spent="true"]:hover {
+        background: rgba(217, 45, 51, .16);
+        background: color-mix(in srgb, #D92D33 16%, transparent);
+      }
+
+      .ofm-balance-emptywrap { padding: 14px 13px 16px; }
+      .ofm-balance-emptyline { font-size: 11.5px; }
+      .ofm-balance-emptyhint { margin-top: 4px; font-size: 10px; opacity: .5; line-height: 1.5; }
+
+      .ofm-balance-foot { padding: 8px 13px 10px; font-size: 10px; opacity: .55; }
     `;
 
     // Visible copy lives in dictionaries, not inline in the component.
@@ -154,7 +182,7 @@ window.__ModuleLoader__.load({
         'panel.stamp': '上次更新：{time}',
         'panel.loading': '查询中…',
         'panel.none': '暂无数据',
-        'state.spent': '已用尽',
+        'state.spent': '用尽',
         'state.empty': '未登录',
         'state.unknown': '未返回',
         'state.failed': '查询失败',
@@ -163,10 +191,12 @@ window.__ModuleLoader__.load({
         'row.empty': '{name} 未登录',
         'row.failed': '{name} 查询失败：{reason}',
         'row.unknown': '{name} 未返回余额{reason}',
-        'foot.some': '{count} 个渠道有余额',
-        'foot.signedOut': '没有渠道登录',
-        'foot.spent': '渠道都用尽了',
-        'foot.unknown': '余额未返回',
+        'foot.funded': '{count} 个可用',
+        'foot.spent': '{count} 个用尽',
+        'foot.failed': '{count} 个未取到',
+        'foot.join': '，',
+        'empty.none': '没有已登录的渠道',
+        'empty.hint': '登录 Our Free Model 的渠道后出现在这里',
       },
       en: {
         'panel.title': 'Channel balances',
@@ -183,10 +213,12 @@ window.__ModuleLoader__.load({
         'row.empty': '{name} is not signed in',
         'row.failed': '{name}: query failed — {reason}',
         'row.unknown': '{name}: no balance returned{reason}',
-        'foot.some': '{count} channels have a balance',
-        'foot.signedOut': 'No channel is signed in',
-        'foot.spent': 'Every channel is used up',
-        'foot.unknown': 'No balance returned',
+        'foot.funded': '{count} available',
+        'foot.spent': '{count} used up',
+        'foot.failed': '{count} not read',
+        'foot.join': ', ',
+        'empty.none': 'No channel is signed in',
+        'empty.hint': 'Sign in to a channel in Our Free Model and it appears here',
       },
     };
 
@@ -210,20 +242,14 @@ window.__ModuleLoader__.load({
       return () => tag.remove();
     }
 
-    /** The figure column for one row: a real number, or a state word. */
-    function rowFigure(row, t) {
-      if (row.state === 'ok') {
-        if (row.value === 0) return { text: t('state.spent'), quiet: true };
-        return { text: `${row.amount}${row.partial ? '+?' : ''}`, quiet: false };
-      }
-      if (row.state === 'empty') return { text: t('state.empty'), quiet: true };
-      if (row.state === 'unknown') return { text: t('state.unknown'), quiet: true };
-      return { text: t('state.failed'), quiet: true };
+    /** Used up is the one status allowed to shout; everything else is quiet. */
+    function isSpent(row) {
+      return row.state === 'ok' && row.value === 0;
     }
 
-    /** The unit suffix, shown only beside a real figure. */
-    function rowUnit(row) {
-      return row.state === 'ok' && row.value !== 0 ? row.unitShort : '';
+    /** Signed in and carrying fuel. */
+    function hasFuel(row) {
+      return row.state === 'ok' && row.value !== 0;
     }
 
     /** One sentence naming the row and what its number means; also the tooltip. */
@@ -238,29 +264,41 @@ window.__ModuleLoader__.load({
     }
 
     /** Everything the chip needs: its vendor mark, its figure, and its tooltip. */
-    function chipParts(rows, channelId, t) {
-      const row = rows.find(candidate => candidate.id === channelId);
-      if (row === undefined) return { mark: '#8A8F98', figure: '—', unit: '', title: '' };
-      if (row.state === 'ok' && row.value !== 0) {
+    function chipParts(allRows, channelId, t) {
+      const row = allRows.find(candidate => candidate.id === channelId);
+      if (row === undefined) return { mark: '#8A8F98', figure: '—', unit: '', spent: false, title: '' };
+      if (isSpent(row)) {
+        return { mark: '#D92D33', figure: '', unit: '', spent: true, title: rowSentence(row, t) };
+      }
+      if (hasFuel(row)) {
         return {
           mark: row.accent,
           figure: `${row.amount}${row.partial ? '+?' : ''}`,
           unit: row.unitShort,
+          spent: false,
           title: rowSentence(row, t),
         };
       }
-      return { mark: row.accent, figure: rowFigure(row, t).text, unit: '', title: rowSentence(row, t) };
+      // Signed in but unreadable: a word, never a zero, so "unknown" can never
+      // be mistaken for "empty".
+      const word = row.state === 'empty' ? t('state.empty') : row.state === 'unknown' ? t('state.unknown') : t('state.failed');
+      return { mark: row.accent, figure: word, unit: '', spent: false, title: rowSentence(row, t) };
     }
 
-    function summaryText(rows, t) {
-      if (rows.length === 0) return t('panel.none');
-      // "Has a balance" means a signed-in channel with something left: a real
-      // zero is signed in but empty, and counting it would overstate the haul.
-      const funded = rows.filter(row => row.state === 'ok' && row.value !== 0).length;
-      if (funded > 0) return t('foot.some', { count: funded });
-      if (rows.every(row => row.state === 'empty')) return t('foot.signedOut');
-      if (rows.every(row => row.state === 'ok')) return t('foot.spent');
-      return t('foot.unknown');
+    /**
+     * The one-line summary. Only channels that are signed in are counted —
+     * the panel itself hides the rest — and "used up" never counts as
+     * available, which is the mistake the footer made before.
+     */
+    function summaryText(visible, t) {
+      const funded = visible.filter(hasFuel).length;
+      const spent = visible.filter(isSpent).length;
+      const failed = visible.length - funded - spent;
+      const parts = [];
+      if (funded > 0) parts.push(t('foot.funded', { count: funded }));
+      if (spent > 0) parts.push(t('foot.spent', { count: spent }));
+      if (failed > 0) parts.push(t('foot.failed', { count: failed }));
+      return parts.join(t('foot.join'));
     }
 
     /**
@@ -410,30 +448,46 @@ window.__ModuleLoader__.load({
       const chip = chipParts(rows, channelId, t);
       const stamp = clockText(fetchedAt);
 
-      const body = rows.length === 0
-        ? h('div', { className: 'ofm-balance-row' },
-          h('span', { className: 'ofm-balance-name' }, busy ? t('panel.loading') : t('panel.none')))
-        : rows.map(row => {
-          const isCurrent = row.id === channelId;
-          const figure = rowFigure(row, t);
-          const unit = rowUnit(row);
+      // The panel is an inventory: a channel with no account is simply not part
+      // of it. A channel that IS signed in but unreadable still appears, because
+      // hiding it would make it look like it had vanished.
+      const visible = rows.filter(row => row.state !== 'empty');
+
+      let body;
+      if (rows.length === 0) {
+        body = h('div', { className: 'ofm-balance-emptywrap' },
+          h('div', { className: 'ofm-balance-emptyline' }, busy ? t('panel.loading') : t('panel.none')));
+      } else if (visible.length === 0) {
+        body = h('div', { className: 'ofm-balance-emptywrap' },
+          h('div', { className: 'ofm-balance-emptyline' }, t('empty.none')),
+          h('div', { className: 'ofm-balance-emptyhint' }, t('empty.hint')));
+      } else {
+        body = h('div', { className: 'ofm-balance-list' }, visible.map(row => {
+          const spent = isSpent(row);
+          const current = row.id === channelId && !spent;
+          const showFigure = hasFuel(row);
+          const word = row.state === 'unknown' ? t('state.unknown') : t('state.failed');
           return h('div', {
             key: row.id,
             className: 'ofm-balance-row',
-            'data-current': isCurrent ? 'true' : 'false',
+            'data-current': current ? 'true' : 'false',
+            'data-spent': spent ? 'true' : 'false',
             style: { '--ofm-row-mark': row.accent },
             title: rowSentence(row, t),
           },
           h('span', {
             className: 'ofm-balance-spine',
-            'data-on': isCurrent ? 'true' : 'false',
+            'data-on': current ? 'true' : 'false',
           }),
           h('span', { className: 'ofm-balance-name' }, row.name),
-          unit === '' ? null : h('span', { className: 'ofm-balance-unit' }, unit),
-          h('span', {
-            className: figure.quiet ? 'ofm-balance-quiet' : 'ofm-balance-figure',
-          }, figure.text));
-        });
+          showFigure ? h('span', { className: 'ofm-balance-unit' }, row.unitShort) : null,
+          spent
+            ? h('span', { className: 'ofm-balance-tag' }, t('state.spent'))
+            : (showFigure
+              ? h('span', { className: 'ofm-balance-figure' }, `${row.amount}${row.partial ? '+?' : ''}`)
+              : h('span', { className: 'ofm-balance-quiet' }, word)));
+        }));
+      }
 
       const panel = h('div', {
         className: 'ofm-balance-panel',
@@ -455,8 +509,8 @@ window.__ModuleLoader__.load({
           // Never disabled: a disabled button shows no spin and reads as dead.
           onClick: () => { if (!busy) load(); },
         }, '↻')),
-      h('div', { className: 'ofm-balance-list' }, body),
-      h('div', { className: 'ofm-balance-foot' }, summaryText(rows, t)));
+      body,
+      visible.length === 0 ? null : h('div', { className: 'ofm-balance-foot' }, summaryText(visible, t)));
 
       return h('span', { className: 'ofm-balance-wrap', ref: wrapRef },
         h('button', {
@@ -464,12 +518,15 @@ window.__ModuleLoader__.load({
           className: 'ofm-balance-chip',
           title: chip.title,
           'data-channel': channelId,
+          'data-spent': chip.spent ? 'true' : 'false',
           'aria-expanded': open ? 'true' : 'false',
           style: { '--ofm-mark': chip.mark },
           onClick: toggle,
         },
         h('span', { className: 'ofm-balance-mark' }),
-        h('span', { className: 'ofm-balance-chip-figure' }, busy && rows.length === 0 ? '…' : chip.figure),
+        chip.spent
+          ? h('span', { className: 'ofm-balance-tag' }, t('state.spent'))
+          : h('span', { className: 'ofm-balance-chip-figure' }, busy && rows.length === 0 ? '…' : chip.figure),
         chip.unit === '' ? null : h('span', { className: 'ofm-balance-chip-unit' }, chip.unit)),
         open ? panel : null);
     }
@@ -484,7 +541,7 @@ window.__ModuleLoader__.load({
           } catch { /* fall through */ }
           try { return ctx.connection ?? null; } catch { return null; }
         };
-        const disposeStyles = ctx.effect(injectStyles, 'ofm-balance: styles');
+        const disposeStyles = ctx.effect(injectStyles, 'ofm-balance-zxp: styles');
 
         // The locale service is read optionally rather than injected: a shell
         // without it must still draw the chip. Registration failure must not
@@ -505,7 +562,7 @@ window.__ModuleLoader__.load({
                 // covers; register just the active one rather than none.
                 try { return locale.register(NS, 'zh', DICT.zh); } catch { return undefined; }
               }
-            }, 'ofm-balance: dictionaries');
+            }, 'ofm-balance-zxp: dictionaries');
             const bound = locale.bind(NS);
             t = (key, values) => {
               const translated = bound(key, values);
