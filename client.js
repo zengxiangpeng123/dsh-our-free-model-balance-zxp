@@ -53,6 +53,11 @@ window.__ModuleLoader__.load({
         border: none; background: transparent; color: inherit; cursor: pointer;
         font-size: 13px; line-height: 1; opacity: .8; padding: 0 2px;
       }
+      .ofm-balance-refresh[data-busy="true"] {
+        display: inline-block; opacity: 1;
+        animation: ofm-balance-spin .9s linear infinite;
+      }
+      @keyframes ofm-balance-spin { to { transform: rotate(360deg); } }
       .ofm-balance-row {
         display: flex; align-items: baseline; gap: 8px; padding: 3px 6px; border-radius: 6px;
       }
@@ -224,6 +229,7 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState(false);
       const sessionId = props.sessionId;
       const t = props.t;
+      const wrapRef = React.useRef(null);
 
       // Reactive, not a one-shot: switching the model re-renders this chip, so
       // its visibility and its channel follow the composer without a reload.
@@ -236,8 +242,8 @@ window.__ModuleLoader__.load({
       // to show; that includes every New API model, so no chip appears.
       const channelId = provider !== null && props.channelIds.has(provider) ? provider : null;
 
-      // Only a click ever asks for a balance; the channel table is static, so
-      // the host answers it once per session and the browser caches it.
+      // The channel table is static for the life of the package: fetch once,
+      // keep forever.
       const channelsRef = React.useRef(null);
 
       const load = React.useCallback(async () => {
@@ -253,28 +259,31 @@ window.__ModuleLoader__.load({
         }
       }, [props.readConnection, sessionId]);
 
-      // Opening shows whatever was fetched last; it never refetches. The
-      // refresh button is the only way to ask again, which is what "manual
-      // refresh only" means for a panel that is opened repeatedly.
       const toggle = React.useCallback(() => { setOpen(previous => !previous); }, []);
 
-      // First open fetches; later opens reuse the stored rows.
+      // One fetch per page life. The rows cover every channel at once, so the
+      // chip can follow any model switch without refetching: switching the
+      // model only re-reads the same cache. The refresh button is the sole
+      // way to ask again — never a timer, never a reopen.
       const fetchedOnce = React.useRef(false);
       React.useEffect(() => {
-        if (open && !fetchedOnce.current) {
+        if (channelId !== null && fetchedOnce.current === false) {
           fetchedOnce.current = true;
           load();
         }
-      }, [open, load]);
+      }, [channelId, load]);
 
-      // Figures fetched for one channel must not be presented as another's:
-      // switching the model invalidates the cache and drops the panel, so the
-      // next open fetches for the channel actually in use.
+      // Click anywhere outside the chip/panel closes the panel. The listener
+      // only exists while the panel is open, and never refetches anything.
       React.useEffect(() => {
-        fetchedOnce.current = false;
-        setRows([]);
-        setOpen(false);
-      }, [channelId]);
+        if (!open || typeof document === 'undefined') return;
+        const close = event => {
+          const root = wrapRef.current;
+          if (root !== null && root.contains && !root.contains(event.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+      }, [open]);
 
       if (channelId === null) return null;
 
@@ -298,12 +307,14 @@ window.__ModuleLoader__.load({
             type: 'button',
             className: 'ofm-balance-refresh',
             title: t('panel.refresh'),
-            disabled: busy,
-            onClick: load,
+            'data-busy': busy ? 'true' : 'false',
+            // Not disabled: a disabled button shows no spin and reads dead.
+            // The refetch is idempotent-safe (worst case: one redundant call).
+            onClick: () => { if (!busy) load(); },
           }, '↻')),
         body);
 
-      return h('span', { className: 'ofm-balance-wrap' },
+      return h('span', { className: 'ofm-balance-wrap', ref: wrapRef },
         h('button', {
           type: 'button',
           className: 'ofm-balance-chip',
