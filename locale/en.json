@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Our Free Model balance",
+    "description": "Shows the current channel's remaining credit beside the composer's model seat, with every channel one click away. No balance is queried until you click."
+  }
+}

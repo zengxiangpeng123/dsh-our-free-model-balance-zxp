@@ -62,6 +62,46 @@ window.__ModuleLoader__.load({
       .ofm-balance-muted { opacity: .55; font-weight: 400; }
     `;
 
+    // Visible copy lives in dictionaries, not inline in the component. The
+    // balance state words are deliberately the same ones OFM's own channel page
+    // uses, so both surfaces describe an account the same way.
+    const NS = 'ofm-balance';
+    const DICT = {
+      zh: {
+        'chip.title': '渠道 {channel}',
+        'panel.title': '各渠道余额',
+        'panel.refresh': '刷新余额',
+        'panel.loading': '余额查询中…',
+        'panel.none': '暂无数据',
+        'state.spent': '已用尽',
+        'state.empty': '未登录',
+        'state.unknown': '未返回余额数据',
+        'state.failed': '余额查询失败：{reason}',
+        'state.failed.short': '未知原因',
+      },
+      en: {
+        'chip.title': 'Channel {channel}',
+        'panel.title': 'Channel balances',
+        'panel.refresh': 'Refresh balances',
+        'panel.loading': 'Querying balances…',
+        'panel.none': 'No data',
+        'state.spent': 'Used up',
+        'state.empty': 'Not signed in',
+        'state.unknown': 'No balance returned',
+        'state.failed': 'Balance query failed: {reason}',
+        'state.failed.short': 'unknown reason',
+      },
+    };
+
+    /** Substitute {name} placeholders; the dictionaries are flat, so this is all we need. */
+    function makeTranslator(dict) {
+      return (key, values) => {
+        const template = dict[key] ?? key;
+        if (values === undefined) return template;
+        return template.replace(/\{(\w+)\}/g, (whole, name) => (name in values ? String(values[name]) : whole));
+      };
+    }
+
     function injectStyles() {
       if (typeof document === 'undefined') return () => {};
       const previous = document.querySelector(`style[data-ofm-balance]`);
@@ -74,21 +114,21 @@ window.__ModuleLoader__.load({
     }
 
     /** The right-hand text for one normalized row. */
-    function valueText(row) {
+    function valueText(row, t) {
       if (row.state === 'ok') {
-        if (row.value === 0) return '已用尽';
+        if (row.value === 0) return t('state.spent');
         return `${row.unitLabel} ${row.value}${row.partial ? '+' : ''}`;
       }
-      if (row.state === 'empty') return '未登录';
-      if (row.state === 'unknown') return '未返回余额数据';
-      return `余额查询失败：${row.reason || '未知原因'}`;
+      if (row.state === 'empty') return t('state.empty');
+      if (row.state === 'unknown') return t('state.unknown');
+      return t('state.failed', { reason: row.reason || t('state.failed.short') });
     }
 
     /** The chip's own text once a balance is known for the current channel. */
-    function chipText(rows, channelId) {
+    function chipText(rows, channelId, t) {
       const row = rows.find(candidate => candidate.id === channelId);
       if (row === undefined || row.state !== 'ok') return '—';
-      if (row.value === 0) return '已用尽';
+      if (row.value === 0) return t('state.spent');
       return `${row.value}${row.partial ? '+?' : ''}`;
     }
 
@@ -143,6 +183,7 @@ window.__ModuleLoader__.load({
       const [rows, setRows] = React.useState([]);
       const [busy, setBusy] = React.useState(false);
       const sessionId = props.sessionId;
+      const t = props.t;
 
       React.useEffect(() => {
         let alive = true;
@@ -187,7 +228,7 @@ window.__ModuleLoader__.load({
 
       const body = rows.length === 0
         ? h('div', { className: 'ofm-balance-row' },
-          h('span', { className: 'ofm-balance-muted' }, busy ? '余额查询中…' : '暂无数据'))
+          h('span', { className: 'ofm-balance-muted' }, busy ? t('panel.loading') : t('panel.none')))
         : rows.map(row => h('div', {
           key: row.id,
           className: 'ofm-balance-row',
@@ -196,15 +237,15 @@ window.__ModuleLoader__.load({
         h('span', { className: 'ofm-balance-name' }, row.name),
         h('span', {
           className: row.state === 'ok' ? 'ofm-balance-value' : 'ofm-balance-value ofm-balance-muted',
-        }, valueText(row))));
+        }, valueText(row, t))));
 
       const panel = h('div', { className: 'ofm-balance-panel' },
         h('div', { className: 'ofm-balance-head' },
-          h('span', null, '各渠道余额'),
+          h('span', null, t('panel.title')),
           h('button', {
             type: 'button',
             className: 'ofm-balance-refresh',
-            title: '刷新余额',
+            title: t('panel.refresh'),
             disabled: busy,
             onClick: load,
           }, '↻')),
@@ -214,11 +255,11 @@ window.__ModuleLoader__.load({
         h('button', {
           type: 'button',
           className: 'ofm-balance-chip',
-          title: `渠道 ${channelId}`,
+          title: t('chip.title', { channel: channelId }),
           'data-channel': channelId,
           'aria-expanded': open ? 'true' : 'false',
           onClick: toggle,
-        }, `⛁ ${rows.length === 0 ? (busy ? '…' : '—') : chipText(rows, channelId)}`),
+        }, `⛁ ${rows.length === 0 ? (busy ? '…' : '—') : chipText(rows, channelId, t)}`),
         open ? panel : null);
     }
 
@@ -233,11 +274,25 @@ window.__ModuleLoader__.load({
           try { return ctx.connection ?? null; } catch { return null; }
         };
         const disposeStyles = ctx.effect(injectStyles, 'ofm-balance: styles');
+
+        // The locale service is read optionally rather than injected: a shell
+        // without it must still draw the chip. `bind` is the shell's own
+        // translator when present; otherwise the Chinese dictionary stands in.
+        let t = makeTranslator(DICT.zh);
+        try {
+          const viaGet = typeof ctx.get === 'function' ? ctx.get('locale') : undefined;
+          const locale = (viaGet !== undefined && viaGet !== null) ? viaGet : ctx.locale;
+          if (locale && typeof locale.bind === 'function') {
+            ctx.effect(() => locale.register(NS, { zh: DICT.zh, en: DICT.en }), 'ofm-balance: dictionaries');
+            t = (key, values) => locale.bind(NS)(key, values);
+          }
+        } catch { /* keep the built-in dictionary */ }
+
         ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
           name: 'conversation.input.left',
           id: 'ofm-balance',
           order: 40,
-        }, props => h(Boundary, null, h(Chip, { ...props, readConnection }))));
+        }, props => h(Boundary, null, h(Chip, { ...props, readConnection, t }))));
         return disposeStyles;
       },
     };
