@@ -1,6 +1,6 @@
 {
   "name": "dsh-our-free-model-balance-zxp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "description": "Our Free Model 余额小图标：在输入框工具行最左端显示当前渠道余额，点开看全部渠道。Reading the free-lane channels' credit balances where the model is chosen.",

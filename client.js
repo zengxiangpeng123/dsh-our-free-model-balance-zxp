@@ -250,6 +250,7 @@ window.__ModuleLoader__.load({
         'panel.stamp': '上次更新：{time}',
         'panel.loading': '查询中…',
         'panel.none': '暂无数据',
+        'host.unreachable': '连不上插件宿主，可能正在重启。这里会自己恢复。',
         'state.spent': '用尽',
         'state.empty': '未登录',
         'state.unknown': '未返回',
@@ -284,6 +285,7 @@ window.__ModuleLoader__.load({
         'settings.poller.polling': '查询中',
         'settings.poller.backoff': '失败，{delay} 秒后重试（{reason}）',
         'settings.poller.stopped': '已暂停：没有界面在显示',
+        'settings.poller.off': '自动刷新已关闭',
         'settings.displayLegend': '显示项',
         'settings.showTimestamp': '面板头部的时间戳',
         'settings.showUnits': '数字后的单位',
@@ -304,6 +306,7 @@ window.__ModuleLoader__.load({
         'panel.stamp': 'Updated {time}',
         'panel.loading': 'Querying…',
         'panel.none': 'No data',
+        'host.unreachable': 'Cannot reach the plugin host — it may be restarting. This recovers on its own.',
         'state.spent': 'Used up',
         'state.empty': 'Not signed in',
         'state.unknown': 'No reply',
@@ -338,6 +341,7 @@ window.__ModuleLoader__.load({
         'settings.poller.polling': 'Reading',
         'settings.poller.backoff': 'Failed, retrying in {delay}s ({reason})',
         'settings.poller.stopped': 'Paused: nothing is showing it',
+        'settings.poller.off': 'Automatic refresh is off',
         'settings.displayLegend': 'What to show',
         'settings.showTimestamp': 'Timestamp in the panel header',
         'settings.showUnits': 'Unit after each figure',
@@ -450,6 +454,10 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = React.useState(false);
       const [snapshot, setSnapshot] = React.useState(null);
       const [busy, setBusy] = React.useState(false);
+      // Distinguishes "the host has not answered yet" from "the host is not
+      // there". Without it an unreachable host reads as a query that never
+      // finishes, which is the one thing a user cannot act on.
+      const [hostDown, setHostDown] = React.useState(false);
       const t = props.t;
       const wrapRef = React.useRef(null);
 
@@ -470,7 +478,8 @@ window.__ModuleLoader__.load({
       // watching. It never fetches balances itself.
       const beat = React.useCallback(async () => {
         const next = await watchNow();
-        if (next === null) return;
+        if (next === null) { setHostDown(true); return; }
+        setHostDown(false);
         setSnapshot(next);
         // The host echoes the saved settings; adopting them keeps this page in
         // step with a change made in another tab.
@@ -569,7 +578,7 @@ window.__ModuleLoader__.load({
       let body;
       if (snapshot === null) {
         body = h('div', { className: 'ofm-balance-emptywrap' },
-          h('div', { className: 'ofm-balance-emptyline' }, t('panel.loading')));
+          h('div', { className: 'ofm-balance-emptyline' }, hostDown ? t('host.unreachable') : t('panel.loading')));
       } else if (visible.length === 0) {
         const signedInCount = rows.filter(row => row.loggedIn === true).length;
         const allHidden = signedInCount > 0;
@@ -707,8 +716,15 @@ window.__ModuleLoader__.load({
         return () => { alive = false; };
       }, []);
 
+      // Rapid toggles read the latest value through a ref, not through the
+      // render's closure: two clicks in one frame would otherwise both start
+      // from the same stale copy and the second would undo the first.
+      const settingsRef = React.useRef(settings);
+      React.useEffect(() => { settingsRef.current = settings; }, [settings]);
+
       const save = async patch => {
-        const next = { ...settings, ...patch };
+        const next = { ...settingsRef.current, ...patch };
+        settingsRef.current = next;
         setSettings(next);
         const payload = await request('/settings', {
           method: 'PUT',
@@ -754,7 +770,9 @@ window.__ModuleLoader__.load({
       let pollerText = t('settings.poller.idle');
       if (poller !== null) {
         if (poller.state === 'polling') pollerText = t('settings.poller.polling');
-        else if (poller.state === 'stopped') pollerText = t('settings.poller.stopped');
+        // A paused poller because the user asked for no automatic refresh is a
+        // setting, not a problem — "nothing is showing it" would be a lie.
+        else if (poller.state === 'stopped') pollerText = secs === 0 ? t('settings.poller.off') : t('settings.poller.stopped');
         else if (poller.state === 'backoff') {
           pollerText = t('settings.poller.backoff', {
             delay: Math.max(1, Math.round((poller.delayMs ?? 0) / 1000)),

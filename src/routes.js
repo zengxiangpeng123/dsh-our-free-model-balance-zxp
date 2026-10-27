@@ -33,7 +33,10 @@ export function createRoutes({ poller, getSettings, putSettings }) {
     if (!allowed.includes(method)) return { status: 405, body: { error: 'method not allowed', allowed } }
 
     if (route === '/snapshot') {
-      return { status: 200, body: poller.read() }
+      // Reading is observing. A client that only ever reads the snapshot is
+      // still a client that has the numbers on screen, so it counts as a watch
+      // — otherwise a passive tab could never keep the poller awake.
+      return { status: 200, body: poller.watch().snapshot }
     }
 
     if (route === '/watch') {

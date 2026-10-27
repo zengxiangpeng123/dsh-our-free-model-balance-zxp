@@ -23,6 +23,18 @@ test('GET /snapshot 返回快照', async () => {
   assert.equal(out.body.at, 1)
 })
 
+test('GET /snapshot 也算一次 watch（只看不动的标签页要能唤醒轮询器）', async () => {
+  let watched = 0
+  const out = await createRoutes(deps({
+    poller: {
+      ...deps().poller,
+      watch: () => { watched += 1; return { snapshot: { at: 7 }, triggered: false } },
+    },
+  })).handle({ method: 'GET', route: '/snapshot' })
+  assert.equal(watched, 1)
+  assert.equal(out.body.at, 7)
+})
+
 test('POST /watch 返回快照并报告是否触发', async () => {
   const out = await createRoutes(deps({ poller: { ...deps().poller, watch: () => ({ snapshot: { at: 2 }, triggered: true }) } })).handle({ method: 'POST', route: '/watch' })
   assert.equal(out.body.at, 2)

@@ -16,6 +16,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { CHANNELS } from './src/channels.js'
 import { loadSettings, sanitizeSettings, saveSettings, settingsFile } from './src/settings.js'
+import { parseJsonObject } from './src/body.js'
 import { makeKernelRpc } from './src/kernel-rpc.js'
 import { fetchRound } from './src/round.js'
 import { createPoller } from './src/poller.js'
@@ -38,16 +39,10 @@ function json(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
-async function readJson(req) {
+async function readBody(req) {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
-  const text = Buffer.concat(chunks).toString('utf8')
-  if (text === '') return {}
-  try {
-    return JSON.parse(text)
-  } catch {
-    return {}
-  }
+  return Buffer.concat(chunks).toString('utf8')
 }
 
 export function apply(ctx) {
@@ -56,6 +51,11 @@ export function apply(ctx) {
 
   /** Start on defaults so the first paint works before the file is read. */
   let settings = sanitizeSettings({})
+  /**
+   * Set once the user has saved anything. The deferred read below must not then
+   * overwrite their choice with what was on disk before they made it.
+   */
+  let userSaved = false
 
   const readConnection = () => {
     try {
@@ -71,15 +71,12 @@ export function apply(ctx) {
     now: () => Date.now(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: handle => clearTimeout(handle),
-    readSettings: () => settings,
-    readConnection,
     fetchRound: () => fetchRound({
       rpc,
       catalogue: CATALOGUE,
       timeoutMs: CHANNEL_TIMEOUT_MS,
       now: () => Date.now(),
     }),
-    catalogue: CATALOGUE,
     settings,
   })
 
@@ -87,8 +84,12 @@ export function apply(ctx) {
     poller,
     getSettings: () => settings,
     putSettings: async next => {
-      settings = next
+      // Write first, then commit to memory: if the disk write fails the caller
+      // gets an error and memory still matches what is on disk. Assigning first
+      // would leave the three copies (memory, disk, poller) disagreeing.
       await saveSettings(file, next)
+      settings = next
+      userSaved = true
       return settings
     },
   })
@@ -96,6 +97,7 @@ export function apply(ctx) {
   // Read the saved settings after the route exists: a slow or broken file must
   // never delay the plugin coming up, and the defaults are already usable.
   void loadSettings(file).then(loaded => {
+    if (userSaved) return
     settings = loaded
     poller.reconfigure(loaded)
   }).catch(() => { /* defaults stand */ })
@@ -106,9 +108,14 @@ export function apply(ctx) {
     handler: async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://localhost')
       const route = url.pathname.slice(BASE.length).replace(/\/+$/, '')
+      const hasBody = req.method === 'PUT' || req.method === 'POST'
       try {
-        const body = req.method === 'PUT' || req.method === 'POST' ? await readJson(req) : undefined
-        const { status, body: payload } = await routes.handle({ method: req.method ?? 'GET', route, body })
+        const parsed = hasBody ? parseJsonObject(await readBody(req)) : { ok: true, value: undefined }
+        if (!parsed.ok) {
+          json(res, 400, { error: parsed.error })
+          return
+        }
+        const { status, body: payload } = await routes.handle({ method: req.method ?? 'GET', route, body: parsed.value })
         json(res, status, payload)
       } catch (error) {
         json(res, 500, { error: error instanceof Error ? error.message : String(error) })
