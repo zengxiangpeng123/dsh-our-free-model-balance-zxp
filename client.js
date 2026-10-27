@@ -66,7 +66,14 @@ window.__ModuleLoader__.load({
     // balance state words are deliberately the same ones OFM's own channel page
     // uses, so both surfaces describe an account the same way.
     const NS = 'ofm-balance';
-    const DICT = {
+
+    // The ten channel ids, mirrored from the host table. A model whose provider
+    // is not in this set has no channel balance and gets no chip at all, which
+    // is why a New API model must not show one.
+    const CHANNEL_IDS = new Set([
+      'lobsterai', 'qoder', 'qodercn', 'trae', 'cline',
+      'loomy', 'raccoon', 'minimax', 'zcode', 'gemini',
+    ]);    const DICT = {
       zh: {
         'chip.title': '渠道 {channel}',
         'panel.title': '各渠道余额',
@@ -150,13 +157,19 @@ window.__ModuleLoader__.load({
      * channel page does it, because a shell without that service must still
      * render this panel rather than stall the plugin forever.
      */
-    async function loadRows(readConnection, sessionId, signal) {
+    async function loadRows(readConnection, sessionId, signal, channelsRef) {
       const connection = readConnection();
       const rpc = connection && connection.rpc ? connection.rpc : undefined;
-      const channels = await fetch(`${ENDPOINT}?sessionId=${encodeURIComponent(String(sessionId))}`, { signal })
-        .then(response => (response.ok ? response.json() : null))
-        .then(payload => (payload && Array.isArray(payload.channels) ? payload.channels : []))
-        .catch(() => []);
+      // The channel table is static for the life of the package, so ask the
+      // host for it once and keep it: a panel opened ten times must not fetch
+      // it ten times.
+      if (channelsRef.current === null) {
+        channelsRef.current = await fetch(`${ENDPOINT}?sessionId=${encodeURIComponent(String(sessionId))}`, { signal })
+          .then(response => (response.ok ? response.json() : null))
+          .then(payload => (payload && Array.isArray(payload.channels) ? payload.channels : []))
+          .catch(() => []);
+      }
+      const channels = channelsRef.current;
 
       const raw = {};
       if (rpc === undefined || typeof rpc.call !== 'function') {
@@ -187,38 +200,51 @@ window.__ModuleLoader__.load({
       return Array.isArray(payload && payload.rows) ? payload.rows : [];
     }
 
+    /**
+     * Read the session's current model selection from the projection the
+     * composer's own model seat reads.
+     *
+     * The selection is NOT `agent.options` — that is captured when the agent is
+     * created and does not follow a later switch. `selectModel` appends a
+     * `model/selection` event and the host projects it to the `modelSelection`
+     * key, whose `next` is the choice awaiting the next request and whose
+     * `lastUsed` is the previous one. `next ?? lastUsed` is therefore what the
+     * composer is showing right now.
+     */
+    function readSelection(projection) {
+      if (projection === undefined || projection === null) return null;
+      const selection = projection.next ?? projection.lastUsed;
+      if (selection === undefined || selection === null) return null;
+      return typeof selection.provider === 'string' && selection.provider !== '' ? selection : null;
+    }
+
     function Chip(props) {
-      const [phase, setPhase] = React.useState('asking');
-      const [channelId, setChannelId] = React.useState(null);
       const [open, setOpen] = React.useState(false);
       const [rows, setRows] = React.useState([]);
       const [busy, setBusy] = React.useState(false);
       const sessionId = props.sessionId;
       const t = props.t;
 
-      React.useEffect(() => {
-        let alive = true;
-        const controller = new AbortController();
-        fetch(`${ENDPOINT}?sessionId=${encodeURIComponent(String(sessionId))}`, { signal: controller.signal })
-          .then(response => (response.ok ? response.json() : null))
-          .then(payload => {
-            if (!alive) return;
-            const id = payload && payload.current ? payload.current.channelId : null;
-            setChannelId(id ?? null);
-            setPhase(id === null || id === undefined ? 'hidden' : 'shown');
-          })
-          .catch(() => { if (alive) setPhase('hidden'); });
-        return () => { alive = false; controller.abort(); };
-      }, [sessionId]);
+      // Reactive, not a one-shot: switching the model re-renders this chip, so
+      // its visibility and its channel follow the composer without a reload.
+      // A shell whose props lack the hook simply never shows the chip.
+      const useProjection = props.useProjection;
+      const projection = typeof useProjection === 'function' ? useProjection('modelSelection') : undefined;
+      const selection = readSelection(projection);
+      const provider = selection === null ? null : selection.provider;
+      // A model whose provider is not one of the free channels has no balance
+      // to show; that includes every New API model, so no chip appears.
+      const channelId = provider !== null && props.channelIds.has(provider) ? provider : null;
 
-      // Only a click ever asks for a balance. No timer, no polling, no
-      // background refresh: opening and the refresh button are the whole
-      // trigger surface.
+      // Only a click ever asks for a balance; the channel table is static, so
+      // the host answers it once per session and the browser caches it.
+      const channelsRef = React.useRef(null);
+
       const load = React.useCallback(async () => {
         setBusy(true);
         const controller = new AbortController();
         try {
-          const next = await loadRows(props.readConnection, sessionId, controller.signal);
+          const next = await loadRows(props.readConnection, sessionId, controller.signal, channelsRef);
           setRows(next);
         } catch {
           setRows([]);
@@ -227,15 +253,30 @@ window.__ModuleLoader__.load({
         }
       }, [props.readConnection, sessionId]);
 
-      const toggle = React.useCallback(() => {
-        setOpen(previous => {
-          const next = !previous;
-          if (next) load();
-          return next;
-        });
-      }, [load]);
+      // Opening shows whatever was fetched last; it never refetches. The
+      // refresh button is the only way to ask again, which is what "manual
+      // refresh only" means for a panel that is opened repeatedly.
+      const toggle = React.useCallback(() => { setOpen(previous => !previous); }, []);
 
-      if (phase !== 'shown') return null;
+      // First open fetches; later opens reuse the stored rows.
+      const fetchedOnce = React.useRef(false);
+      React.useEffect(() => {
+        if (open && !fetchedOnce.current) {
+          fetchedOnce.current = true;
+          load();
+        }
+      }, [open, load]);
+
+      // Figures fetched for one channel must not be presented as another's:
+      // switching the model invalidates the cache and drops the panel, so the
+      // next open fetches for the channel actually in use.
+      React.useEffect(() => {
+        fetchedOnce.current = false;
+        setRows([]);
+        setOpen(false);
+      }, [channelId]);
+
+      if (channelId === null) return null;
 
       const body = rows.length === 0
         ? h('div', { className: 'ofm-balance-row' },
@@ -318,7 +359,7 @@ window.__ModuleLoader__.load({
           name: 'conversation.input.left',
           id: 'ofm-balance',
           order: 40,
-        }, props => h(Boundary, null, h(Chip, { ...props, readConnection, t }))));
+        }, props => h(Boundary, null, h(Chip, { ...props, readConnection, t, channelIds: CHANNEL_IDS }))));
         return disposeStyles;
       },
     };

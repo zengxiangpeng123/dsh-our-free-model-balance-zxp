@@ -1,15 +1,19 @@
 /**
- * Host half: answer "which channel is this session on, and what are the
- * channels" plus "turn this raw balance data into rows".
+ * Host half: publish the channel table and turn raw balance replies into rows.
  *
- * Everything decidable lives here, not in the browser half: the channel table,
- * the session lookup and the balance normalization. The browser half cannot be
- * unit-tested in this deployment (it is delivered through the page's module
- * loader, not imported by Node), so it is kept to fetching and drawing.
+ * Everything decidable lives here, not in the browser half: the channel table
+ * and the balance normalization are pure and unit-tested. The browser half
+ * cannot be tested in this deployment (the page's module loader delivers it,
+ * so Node never imports it), so it is kept to fetching and drawing.
+ *
+ * The session's *current* model is deliberately not served here. It is not
+ * `agent.options` (captured at agent creation, stale after a model switch) and
+ * it is not `agentDefaultModel` (the default for new sessions). The composer's
+ * own seat reads it from the `modelSelection` projection, and the browser half
+ * reads that same projection — one source of truth, already reactive.
  */
 import { CHANNELS, unitLabel } from './src/channels.js'
 import { normalizeRow } from './src/balances.js'
-import { readSessionSelection } from './src/session-model.js'
 
 export const name = 'dsh-ofm-balance'
 export const inject = ['webServer']
@@ -33,19 +37,6 @@ async function readJson(req) {
   }
 }
 
-/** `ctx.get` is the optional-access form; a shell without it must not throw. */
-function optionalService(ctx, key) {
-  try {
-    const viaGet = typeof ctx.get === 'function' ? ctx.get(key) : undefined
-    if (viaGet !== undefined && viaGet !== null) return viaGet
-  } catch { /* fall through */ }
-  try {
-    return ctx[key] ?? null
-  } catch {
-    return null
-  }
-}
-
 export function apply(ctx) {
   const publicChannels = CHANNELS.map(channel => ({ ...channel, unitLabel: unitLabel(channel.unit) }))
 
@@ -57,11 +48,7 @@ export function apply(ctx) {
       const route = url.pathname.replace(/^\/api\/ofm-balance/, '').replace(/\/+$/, '')
 
       if (req.method === 'GET' && route === '') {
-        const sessionId = url.searchParams.get('sessionId') ?? ''
-        json(res, 200, {
-          current: readSessionSelection(optionalService(ctx, 'agents'), sessionId),
-          channels: publicChannels,
-        })
+        json(res, 200, { channels: publicChannels })
         return
       }
 
@@ -75,5 +62,5 @@ export function apply(ctx) {
 
       json(res, 404, { error: 'not found' })
     },
-  }), 'ofm-balance: channel, model and row routes')
+  }), 'ofm-balance: channel table and row routes')
 }
