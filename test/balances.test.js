@@ -95,3 +95,35 @@ test('没有账号可读时保留原因，供面板显示', () => {
   const row = normalizeRow('loomy', env([{ accountId: 'a', balance: null, error: '积分查询失败（凭据失效或响应异常）' }]))
   assert.equal(row.reason, '积分查询失败（凭据失效或响应异常）')
 })
+
+// ── 显示精度：面板只显示一位小数 ──────────────────────────────────────────
+// value 保持精确值（"已用尽" 的判定依赖它），amount 是给界面看的字符串。
+
+test('小数只显示一位', () => {
+  const row = normalizeRow('trae', env([{ accountId: 'a', balance: { total: 356.2848 } }]))
+  assert.equal(row.value, 356.2848, '精确值必须保留，供 0 判定使用')
+  assert.equal(row.amount, '356.3')
+})
+
+test('整数不显示小数点', () => {
+  const row = normalizeRow('loomy', env([{ accountId: 'a', balance: { total: 573 } }]))
+  assert.equal(row.amount, '573')
+})
+
+test('恰好 0 显示为 0', () => {
+  const row = normalizeRow('trae', env([{ accountId: 'a', balance: 0 }]))
+  assert.equal(row.value, 0)
+  assert.equal(row.amount, '0')
+})
+
+test('极小余额取整成 0 时，value 仍非 0（不能被误判为已用尽）', () => {
+  const row = normalizeRow('cline', env([{ accountId: 'a', balance: 0.04 }]))
+  assert.equal(row.value, 0.04)
+  assert.notEqual(row.value, 0)
+  assert.equal(row.amount, '0')
+})
+
+test('小数进位正确', () => {
+  assert.equal(normalizeRow('trae', env([{ accountId: 'a', balance: 12.35 }])).amount, '12.4')
+  assert.equal(normalizeRow('trae', env([{ accountId: 'a', balance: 4.1 }])).amount, '4.1')
+})

@@ -22,6 +22,7 @@ function blank(id, name, unit) {
     unitLabel: unitLabel(unit),
     state: /** @type {RowState} */ ('unavailable'),
     value: null,
+    amount: '',
     partial: false,
     reason: '',
   }
@@ -86,8 +87,24 @@ export function normalizeRow(channelId, envelope) {
   }
 
   row.state = 'ok'
-  row.value = Math.min(...values)
+  // `value` stays exact: the "used up" decision is `value === 0`, and a
+  // rounded value would turn a real 0.04 into 0 and report a false "used up".
+  // `amount` is the display form only.
+  const exact = Math.min(...values)
+  row.value = exact
+  row.amount = formatAmount(exact)
   row.partial = partial
   row.reason = reason
   return row
+}
+
+/**
+ * The display form of a balance: one decimal place, and no decimal point at
+ * all for whole numbers. The chip and each panel row are narrow, so a raw
+ * 356.2848 becomes "356.3" while 573 stays "573".
+ */
+function formatAmount(value) {
+  if (!Number.isFinite(value)) return ''
+  const rounded = Math.round(value * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
 }

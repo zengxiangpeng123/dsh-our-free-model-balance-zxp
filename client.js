@@ -129,7 +129,7 @@ window.__ModuleLoader__.load({
     function valueText(row, t) {
       if (row.state === 'ok') {
         if (row.value === 0) return t('state.spent');
-        return `${row.unitLabel} ${row.value}${row.partial ? '+?' : ''}`;
+        return `${row.unitLabel} ${row.amount}${row.partial ? '+?' : ''}`;
       }
       if (row.state === 'empty') return t('state.empty');
       if (row.state === 'unknown') {
@@ -152,7 +152,7 @@ window.__ModuleLoader__.load({
       const row = rows.find(candidate => candidate.id === channelId);
       if (row === undefined || row.state !== 'ok') return '—';
       if (row.value === 0) return t('state.spent');
-      return `${row.value}${row.partial ? '+?' : ''}`;
+      return `${row.amount}${row.partial ? '+?' : ''}`;
     }
 
     /**
