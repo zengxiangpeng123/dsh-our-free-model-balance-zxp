@@ -4,14 +4,24 @@ import { normalizeRow } from '../src/balances.js'
 
 const env = accounts => ({ ok: true, value: { accounts } })
 
-test('全部账号有数 → ok，取最小值', () => {
+test('全部账号有数 → ok，取总和（与 OFM 面板口径一致）', () => {
   const row = normalizeRow('loomy', env([
     { accountId: 'a', balance: 12.3 }, { accountId: 'b', balance: 4.1 },
   ]))
   assert.equal(row.state, 'ok')
-  assert.equal(row.value, 4.1)
+  assert.equal(row.value, 16.4)
   assert.equal(row.partial, false)
   assert.equal(row.unitLabel, '剩余积分')
+})
+
+test('三个账号也求和', () => {
+  const row = normalizeRow('loomy', env([
+    { accountId: 'a', balance: { total: 573 } },
+    { accountId: 'b', balance: { total: 356.2848 } },
+    { accountId: 'c', balance: { total: 0 } },
+  ]))
+  assert.equal(row.value, 929.2848)
+  assert.equal(row.amount, '929.3')
 })
 
 test('余额 0 是已用光，不是查不到', () => {
@@ -66,12 +76,13 @@ test('余额是结构化对象时取 total', () => {
   assert.equal(row.value, 573)
 })
 
-test('多个结构化余额取最小 total', () => {
+test('多个结构化余额取总和', () => {
   const row = normalizeRow('trae', env([
     { accountId: 'a', balance: { total: 356.2848 } },
     { accountId: 'b', balance: { total: 12 } },
   ]))
-  assert.equal(row.value, 12)
+  assert.equal(row.value, 368.2848)
+  assert.equal(row.amount, '368.3')
   assert.equal(row.partial, false)
 })
 

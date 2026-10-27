@@ -95,7 +95,14 @@ export function normalizeRow(channelId, envelope) {
   // `value` stays exact: the "used up" decision is `value === 0`, and a
   // rounded value would turn a real 0.04 into 0 and report a false "used up".
   // `amount` is the display form only.
-  const exact = Math.min(...values)
+  //
+  // Across one channel's accounts the meaningful figure is the SUM: the
+  // gateway hands a request to any account in the pool, so the pool's total is
+  // what the user actually has left — the same number OFM's own panel shows
+  // ("账号 2/2 · 剩余积分 15K"). The first version took the minimum, which
+  // answered a different question ("when does the first account run dry") and
+  // disagreed with the source of truth.
+  const exact = values.reduce((total, value) => total + value, 0)
   row.value = exact
   row.amount = formatAmount(exact)
   row.partial = partial
