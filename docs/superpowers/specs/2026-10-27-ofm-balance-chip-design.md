@@ -1,6 +1,8 @@
 # OFM 余额小图标 —— 设计文档
 
-> **包已更名（2026-10-27）**：包名 `dsh-ofm-balance` → `dsh-ofm-balance-zxp`，安装目录同名加后缀，接口路径 `/api/ofm-balance` → `/api/ofm-balance-zxp`。本文正文保留更名前的写法以便追溯。
+> **包名演进（2026-10-27）**：`dsh-ofm-balance` → `dsh-ofm-balance-zxp` → **`dsh-our-free-model-balance-zxp`**（最终名）。理由：要与前置插件 `dsh-our-free-model` 的包名同前缀，别人搜 "our free model" 时才匹配得到；`ofm` 缩写搜不到。安装目录同名，接口路径现为 `/api/our-free-model-balance-zxp`。本文正文保留更名前的写法以便追溯。
+
+> **背景事实**：社区已存在同名同功能的第三方插件 `dsh-ofm-balance` v0.8.4（作者 Shen-18），本机 profile 里装过并已 `disabled: true`。我们的包名与之不同，不冲突。
 
 > **第 3 稿 · 显示规则变更（2026-10-27，需求方确认）**：本文 §2/§9 里「列出全部十个渠道」「未登录显示为一行」的写法**已作废**，以下三条取代之：
 > 1. **未登录的渠道不显示**（`state === 'empty'`，即该渠道一个账号都没有）。`查询失败`/`未返回` 的渠道**仍显示**——它已登录，只是这次没取到数；隐藏它会让渠道凭空消失。

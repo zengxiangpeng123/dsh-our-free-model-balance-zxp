@@ -15,10 +15,10 @@
 import { CHANNELS, unitLabel } from './src/channels.js'
 import { normalizeRow } from './src/balances.js'
 
-export const name = 'dsh-ofm-balance-zxp'
+export const name = 'dsh-our-free-model-balance-zxp'
 export const inject = ['webServer']
 
-const BASE = '/api/ofm-balance-zxp'
+const BASE = '/api/our-free-model-balance-zxp'
 
 function json(res, status, body) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
@@ -45,7 +45,7 @@ export function apply(ctx) {
     path: BASE,
     handler: async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://localhost')
-      const route = url.pathname.replace(/^\/api\/ofm-balance-zxp/, '').replace(/\/+$/, '')
+      const route = url.pathname.replace(/^\/api\/our-free-model-balance-zxp/, '').replace(/\/+$/, '')
 
       if (req.method === 'GET' && route === '') {
         json(res, 200, { channels: publicChannels })
@@ -62,5 +62,5 @@ export function apply(ctx) {
 
       json(res, 404, { error: 'not found' })
     },
-  }), 'ofm-balance-zxp: channel table and row routes')
+  }), 'our-free-model-balance-zxp: channel table and row routes')
 }

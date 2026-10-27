@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-ofm-balance-zxp',
+  id: 'dsh-our-free-model-balance-zxp',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -21,8 +21,8 @@ window.__ModuleLoader__.load({
     // harness can be mounted under a reverse-proxy sub-path, where a leading
     // slash drops the prefix and the request misses the app entirely.
     const ENDPOINT = (() => {
-      try { return new URL('api/ofm-balance-zxp', document.baseURI).pathname; }
-      catch { return '/api/ofm-balance-zxp'; }
+      try { return new URL('api/our-free-model-balance-zxp', document.baseURI).pathname; }
+      catch { return '/api/our-free-model-balance-zxp'; }
     })();
 
     const STYLE_ID = 'ofm-balance-styles';
@@ -165,7 +165,7 @@ window.__ModuleLoader__.load({
     `;
 
     // Visible copy lives in dictionaries, not inline in the component.
-    const NS = 'ofm-balance-zxp';
+    const NS = 'our-free-model-balance-zxp';
 
     // The ten channel ids, mirrored from the host table. A model whose provider
     // is not in this set has no channel balance and gets no chip at all, which
@@ -541,7 +541,7 @@ window.__ModuleLoader__.load({
           } catch { /* fall through */ }
           try { return ctx.connection ?? null; } catch { return null; }
         };
-        const disposeStyles = ctx.effect(injectStyles, 'ofm-balance-zxp: styles');
+        const disposeStyles = ctx.effect(injectStyles, 'our-free-model-balance-zxp: styles');
 
         // The locale service is read optionally rather than injected: a shell
         // without it must still draw the chip. Registration failure must not
@@ -562,7 +562,7 @@ window.__ModuleLoader__.load({
                 // covers; register just the active one rather than none.
                 try { return locale.register(NS, 'zh', DICT.zh); } catch { return undefined; }
               }
-            }, 'ofm-balance-zxp: dictionaries');
+            }, 'our-free-model-balance-zxp: dictionaries');
             const bound = locale.bind(NS);
             t = (key, values) => {
               const translated = bound(key, values);
@@ -573,7 +573,7 @@ window.__ModuleLoader__.load({
 
         ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
           name: 'conversation.input.left',
-          id: 'ofm-balance-zxp',
+          id: 'our-free-model-balance-zxp',
           order: 40,
         }, props => h(Boundary, null, h(Chip, { ...props, readConnection, t, channelIds: CHANNEL_IDS }))));
         return disposeStyles;
