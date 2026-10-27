@@ -7,8 +7,11 @@
  * unit-tested in this deployment (it is delivered through the page's module
  * loader, not imported by Node), so it is kept to fetching and drawing.
  */
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { CHANNELS, unitLabel } from './src/channels.js'
-import { normalizeRow, aggregateValue } from './src/balances.js'
+import { normalizeRow } from './src/balances.js'
 import { readSessionSelection } from './src/session-model.js'
 
 export const name = 'dsh-ofm-balance'
@@ -68,8 +71,16 @@ export function apply(ctx) {
       if (req.method === 'POST' && route === '/rows') {
         const payload = await readJson(req)
         const raw = payload && typeof payload.raw === 'object' && payload.raw !== null ? payload.raw : {}
+        // TEMPORARY DIAGNOSTIC: the balance queries come back empty and the
+        // reason only exists inside this reply, which the browser half would
+        // otherwise be the only place to see. Dropped on disk so it can be
+        // read back without asking anyone to transcribe a screen. Remove once
+        // the empty-balance cause is understood.
+        try {
+          fs.writeFileSync(path.join(os.tmpdir(), 'ofm-balance-raw.json'), JSON.stringify({ at: Date.now(), raw }, null, 2))
+        } catch { /* diagnostics must never break the request */ }
         const rows = CHANNELS.map(channel => normalizeRow(channel.id, raw[channel.id]))
-        json(res, 200, { rows, aggregate: aggregateValue(rows) })
+        json(res, 200, { rows })
         return
       }
 

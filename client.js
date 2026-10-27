@@ -117,11 +117,22 @@ window.__ModuleLoader__.load({
     function valueText(row, t) {
       if (row.state === 'ok') {
         if (row.value === 0) return t('state.spent');
-        return `${row.unitLabel} ${row.value}${row.partial ? '+' : ''}`;
+        return `${row.unitLabel} ${row.value}${row.partial ? '+?' : ''}`;
       }
       if (row.state === 'empty') return t('state.empty');
-      if (row.state === 'unknown') return t('state.unknown');
+      if (row.state === 'unknown') {
+        // Carry the reason: "no balance returned" alone leaves the reader with
+        // nothing to act on, and the reason distinguishes a missing sign-in
+        // from a failed query.
+        return row.reason ? `${t('state.unknown')}（${row.reason}）` : t('state.unknown');
+      }
       return t('state.failed', { reason: row.reason || t('state.failed.short') });
+    }
+
+    /** The display name of a channel, falling back to its id before any rows exist. */
+    function channelName(rows, channelId) {
+      const row = rows.find(candidate => candidate.id === channelId);
+      return row === undefined ? channelId : row.name;
     }
 
     /** The chip's own text once a balance is known for the current channel. */
@@ -255,7 +266,7 @@ window.__ModuleLoader__.load({
         h('button', {
           type: 'button',
           className: 'ofm-balance-chip',
-          title: t('chip.title', { channel: channelId }),
+          title: t('chip.title', { channel: channelName(rows, channelId) }),
           'data-channel': channelId,
           'aria-expanded': open ? 'true' : 'false',
           onClick: toggle,
@@ -276,15 +287,30 @@ window.__ModuleLoader__.load({
         const disposeStyles = ctx.effect(injectStyles, 'ofm-balance: styles');
 
         // The locale service is read optionally rather than injected: a shell
-        // without it must still draw the chip. `bind` is the shell's own
-        // translator when present; otherwise the Chinese dictionary stands in.
+        // without it must still draw the chip. Registration failure must not
+        // degrade the panel to raw keys either — a namespace with no dictionary
+        // makes `bind` echo the key back — so an unregistered namespace falls
+        // through to the built-in Chinese dictionary below.
         let t = makeTranslator(DICT.zh);
+        const builtin = makeTranslator(DICT.zh);
         try {
           const viaGet = typeof ctx.get === 'function' ? ctx.get('locale') : undefined;
           const locale = (viaGet !== undefined && viaGet !== null) ? viaGet : ctx.locale;
-          if (locale && typeof locale.bind === 'function') {
-            ctx.effect(() => locale.register(NS, { zh: DICT.zh, en: DICT.en }), 'ofm-balance: dictionaries');
-            t = (key, values) => locale.bind(NS)(key, values);
+          if (locale && typeof locale.bind === 'function' && typeof locale.register === 'function') {
+            ctx.effect(() => {
+              try {
+                return locale.register(NS, { zh: DICT.zh, en: DICT.en });
+              } catch {
+                // A shell shipping more built-in locales than this dictionary
+                // covers; register just the active one rather than none.
+                try { return locale.register(NS, 'zh', DICT.zh); } catch { return undefined; }
+              }
+            }, 'ofm-balance: dictionaries');
+            const bound = locale.bind(NS);
+            t = (key, values) => {
+              const translated = bound(key, values);
+              return translated === key ? builtin(key, values) : translated;
+            };
           }
         } catch { /* keep the built-in dictionary */ }
 

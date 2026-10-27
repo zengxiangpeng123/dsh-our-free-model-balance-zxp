@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeRow, aggregateValue } from '../src/balances.js'
+import { normalizeRow } from '../src/balances.js'
 
 const env = accounts => ({ ok: true, value: { accounts } })
 
@@ -54,8 +54,7 @@ test('不认识的渠道 → unavailable，不猜数字', () => {
   assert.equal(row.reason, '未知渠道')
 })
 
-test('有账号查不到时聚合值标 partial', () => {
-  assert.deepEqual(aggregateValue([{ value: 5, partial: false }]), { value: 5, partial: false })
-  assert.deepEqual(aggregateValue([{ value: 5, partial: true }]), { value: 5, partial: true })
-  assert.deepEqual(aggregateValue([{ value: null, partial: false }]), { value: null, partial: false })
+test('没有账号可读时保留原因，供面板显示', () => {
+  const row = normalizeRow('loomy', env([{ accountId: 'a', balance: null, error: '积分查询失败（凭据失效或响应异常）' }]))
+  assert.equal(row.reason, '积分查询失败（凭据失效或响应异常）')
 })

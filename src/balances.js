@@ -75,14 +75,3 @@ export function normalizeRow(channelId, envelope) {
   row.reason = reason
   return row
 }
-
-/** The value the chip shows: the smallest known figure, flagged if any account was unreadable. */
-export function aggregateValue(rows) {
-  const values = []
-  let partial = false
-  for (const row of Array.isArray(rows) ? rows : []) {
-    if (typeof row?.value === 'number' && Number.isFinite(row.value)) values.push(row.value)
-    if (row?.partial === true) partial = true
-  }
-  return { value: values.length === 0 ? null : Math.min(...values), partial }
-}
