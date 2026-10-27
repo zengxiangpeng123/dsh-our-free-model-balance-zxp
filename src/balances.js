@@ -10,16 +10,21 @@
  * this out — showing 0 for an unreadable account would tell the user they have
  * nothing when the truth is that we do not know.
  */
-import { channelFor, unitLabel } from './channels.js'
+import { channelFor, unitLabel, unitShort } from './channels.js'
 
 /** @typedef {'ok'|'empty'|'unknown'|'unavailable'} RowState */
 
 function blank(id, name, unit) {
+  const channel = channelFor(id)
   return {
     id,
     name,
     unit,
     unitLabel: unitLabel(unit),
+    unitShort: unitShort(unit),
+    // The vendor's own colour travels with the row, so the browser half needs
+    // no second copy of the channel table to mark the current one.
+    accent: channel === undefined ? '#8A8F98' : channel.accent,
     state: /** @type {RowState} */ ('unavailable'),
     value: null,
     amount: '',

@@ -26,50 +26,117 @@ window.__ModuleLoader__.load({
     })();
 
     const STYLE_ID = 'ofm-balance-styles';
+
+    /**
+     * A readout, not a dashboard.
+     *
+     * The subject is ten free-tier channels with different units, watched by
+     * one person who wants to know which tanks still have gas. So the panel is
+     * a ledger: names left, figures right in tabular numerals so magnitudes
+     * compare down the column, and one reserved spine slot that only the
+     * channel the current model is actually using fills in. That spine — and
+     * its echo in the chip — is the design's only loud element; everything
+     * else stays quiet, and the host's own surface, border and text tokens do
+     * the rest so the popover belongs to whatever theme it is dropped into.
+     *
+     * Deliberately absent: per-row cards, gradient decoration, ALL-CAPS
+     * tracked labels, dotted meta strings, and a rule under every row.
+     */
     const CSS = `
       .ofm-balance-wrap { position: relative; display: inline-flex; }
+
       .ofm-balance-chip {
-        display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px;
-        border-radius: 11px; border: 1px solid currentColor; opacity: .75; font-size: 11px;
-        line-height: 1; white-space: nowrap; background: transparent; color: inherit;
-        cursor: pointer; font: inherit;
+        display: inline-flex; align-items: center; gap: 6px;
+        height: 22px; padding: 0 9px 0 8px; border-radius: 11px;
+        border: 1px solid var(--dsw-alias-border-l2, rgba(128, 132, 140, .38));
+        background: transparent; color: inherit; font: inherit; font-size: 11px;
+        line-height: 1; white-space: nowrap; cursor: pointer; opacity: .82;
+        transition: opacity .12s ease-out;
       }
       .ofm-balance-chip:hover { opacity: 1; }
+      .ofm-balance-chip:focus-visible {
+        outline: 2px solid var(--ofm-focus, #4C7DFF); outline-offset: 2px;
+      }
+      .ofm-balance-mark {
+        width: 6px; height: 6px; border-radius: 2px; flex: 0 0 auto;
+        background: var(--ofm-mark, #8A8F98);
+      }
+      .ofm-balance-chip-figure { font-variant-numeric: tabular-nums; }
+      .ofm-balance-chip-unit { opacity: .6; }
+
       .ofm-balance-panel {
-        position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;
-        min-width: 260px; max-width: 360px; padding: 8px 10px; border-radius: 10px;
-        border: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.35));
+        position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 40;
+        box-sizing: border-box; width: 292px;
+        max-width: min(292px, calc(100vw - 28px));
+        border-radius: 12px; overflow: hidden;
+        border: 1px solid var(--dsw-alias-border-l2, rgba(128, 132, 140, .34));
         background: var(--dsw-alias-bg-layer-1, Canvas);
         color: var(--dsw-alias-label-primary, CanvasText);
-        box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 12px;
+        box-shadow: 0 12px 28px -10px rgba(0, 0, 0, .30), 0 2px 6px rgba(0, 0, 0, .10);
+        font-size: 12px; text-align: left;
       }
+
       .ofm-balance-head {
-        display: flex; align-items: center; justify-content: space-between; gap: 8px;
-        padding-bottom: 6px; margin-bottom: 4px;
-        border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.25));
-        font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; opacity: .6;
+        display: flex; align-items: center; gap: 8px;
+        padding: 9px 8px 8px 12px;
+        border-bottom: 1px solid var(--ofm-hair, rgba(128, 132, 140, .22));
+      }
+      .ofm-balance-title { flex: 1; min-width: 0; font-size: 11.5px; }
+      .ofm-balance-stamp {
+        flex: 0 0 auto; font-size: 10px; opacity: .55;
+        font-variant-numeric: tabular-nums;
       }
       .ofm-balance-refresh {
-        border: none; background: transparent; color: inherit; cursor: pointer;
-        font-size: 13px; line-height: 1; opacity: .8; padding: 0 2px;
+        flex: 0 0 auto; width: 20px; height: 20px; padding: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        border: none; border-radius: 6px; background: transparent;
+        color: inherit; cursor: pointer; font-size: 13px; line-height: 1; opacity: .7;
+      }
+      .ofm-balance-refresh:hover { opacity: 1; background: rgba(128, 132, 140, .14); }
+      .ofm-balance-refresh:focus-visible {
+        outline: 2px solid var(--ofm-focus, #4C7DFF); outline-offset: 1px;
       }
       .ofm-balance-refresh[data-busy="true"] {
-        display: inline-block; opacity: 1;
-        animation: ofm-balance-spin .9s linear infinite;
+        opacity: 1; animation: ofm-balance-spin .9s linear infinite;
       }
       @keyframes ofm-balance-spin { to { transform: rotate(360deg); } }
-      .ofm-balance-row {
-        display: flex; align-items: baseline; gap: 8px; padding: 3px 6px; border-radius: 6px;
+      @media (prefers-reduced-motion: reduce) {
+        .ofm-balance-refresh[data-busy="true"] { animation: none; opacity: .45; }
       }
-      .ofm-balance-row[data-current="true"] { background: rgba(90,120,230,.16); font-weight: 600; }
-      .ofm-balance-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .ofm-balance-value { flex-shrink: 0; font-variant-numeric: tabular-nums; }
-      .ofm-balance-muted { opacity: .55; font-weight: 400; }
+
+      .ofm-balance-list { padding: 4px 0; }
+      .ofm-balance-row {
+        display: flex; align-items: center; gap: 7px;
+        padding: 4px 12px 4px 0;
+      }
+      .ofm-balance-row:hover { background: rgba(128, 132, 140, .10); }
+      .ofm-balance-row[data-current="true"] {
+        background: rgba(128, 132, 140, .12);
+        background: color-mix(in srgb, var(--ofm-row-mark, #4C7DFF) 13%, transparent);
+      }
+      .ofm-balance-spine {
+        flex: 0 0 3px; width: 3px; height: 15px; border-radius: 0 2px 2px 0;
+        background: var(--ofm-row-mark, #8A8F98); opacity: 0;
+      }
+      .ofm-balance-spine[data-on="true"] { opacity: 1; }
+      .ofm-balance-name {
+        flex: 1 1 auto; min-width: 0; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap;
+      }
+      .ofm-balance-row[data-current="true"] .ofm-balance-name { font-weight: 600; }
+      .ofm-balance-unit { flex: 0 0 auto; font-size: 10px; opacity: .5; }
+      .ofm-balance-figure {
+        flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums;
+      }
+      .ofm-balance-quiet {
+        flex: 0 0 auto; font-size: 11px; opacity: .48;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .ofm-balance-foot { padding: 7px 12px 9px; font-size: 10px; opacity: .6; }
     `;
 
-    // Visible copy lives in dictionaries, not inline in the component. The
-    // balance state words are deliberately the same ones OFM's own channel page
-    // uses, so both surfaces describe an account the same way.
+    // Visible copy lives in dictionaries, not inline in the component.
     const NS = 'ofm-balance';
 
     // The ten channel ids, mirrored from the host table. A model whose provider
@@ -78,30 +145,48 @@ window.__ModuleLoader__.load({
     const CHANNEL_IDS = new Set([
       'lobsterai', 'qoder', 'qodercn', 'trae', 'cline',
       'loomy', 'raccoon', 'minimax', 'zcode', 'gemini',
-    ]);    const DICT = {
+    ]);
+
+    const DICT = {
       zh: {
-        'chip.title': '渠道 {channel}',
-        'panel.title': '各渠道余额',
-        'panel.refresh': '刷新余额',
-        'panel.loading': '余额查询中…',
+        'panel.title': '渠道余额',
+        'panel.refresh': '重新查询余额',
+        'panel.stamp': '上次更新：{time}',
+        'panel.loading': '查询中…',
         'panel.none': '暂无数据',
         'state.spent': '已用尽',
         'state.empty': '未登录',
-        'state.unknown': '未返回余额数据',
-        'state.failed': '余额查询失败：{reason}',
-        'state.failed.short': '未知原因',
+        'state.unknown': '未返回',
+        'state.failed': '查询失败',
+        'row.ok': '{name} 剩余{unit} {amount}',
+        'row.spent': '{name} 已用尽',
+        'row.empty': '{name} 未登录',
+        'row.failed': '{name} 查询失败：{reason}',
+        'row.unknown': '{name} 未返回余额{reason}',
+        'foot.some': '{count} 个渠道有余额',
+        'foot.signedOut': '没有渠道登录',
+        'foot.spent': '渠道都用尽了',
+        'foot.unknown': '余额未返回',
       },
       en: {
-        'chip.title': 'Channel {channel}',
         'panel.title': 'Channel balances',
-        'panel.refresh': 'Refresh balances',
-        'panel.loading': 'Querying balances…',
+        'panel.refresh': 'Query balances again',
+        'panel.stamp': 'Updated {time}',
+        'panel.loading': 'Querying…',
         'panel.none': 'No data',
         'state.spent': 'Used up',
         'state.empty': 'Not signed in',
-        'state.unknown': 'No balance returned',
-        'state.failed': 'Balance query failed: {reason}',
-        'state.failed.short': 'unknown reason',
+        'state.unknown': 'No reply',
+        'state.failed': 'Query failed',
+        'row.ok': '{name} has {amount} {unit} left',
+        'row.spent': '{name} is used up',
+        'row.empty': '{name} is not signed in',
+        'row.failed': '{name}: query failed — {reason}',
+        'row.unknown': '{name}: no balance returned{reason}',
+        'foot.some': '{count} channels have a balance',
+        'foot.signedOut': 'No channel is signed in',
+        'foot.spent': 'Every channel is used up',
+        'foot.unknown': 'No balance returned',
       },
     };
 
@@ -125,34 +210,67 @@ window.__ModuleLoader__.load({
       return () => tag.remove();
     }
 
-    /** The right-hand text for one normalized row. */
-    function valueText(row, t) {
+    /** The figure column for one row: a real number, or a state word. */
+    function rowFigure(row, t) {
       if (row.state === 'ok') {
-        if (row.value === 0) return t('state.spent');
-        return `${row.unitLabel} ${row.amount}${row.partial ? '+?' : ''}`;
+        if (row.value === 0) return { text: t('state.spent'), quiet: true };
+        return { text: `${row.amount}${row.partial ? '+?' : ''}`, quiet: false };
       }
-      if (row.state === 'empty') return t('state.empty');
+      if (row.state === 'empty') return { text: t('state.empty'), quiet: true };
+      if (row.state === 'unknown') return { text: t('state.unknown'), quiet: true };
+      return { text: t('state.failed'), quiet: true };
+    }
+
+    /** The unit suffix, shown only beside a real figure. */
+    function rowUnit(row) {
+      return row.state === 'ok' && row.value !== 0 ? row.unitShort : '';
+    }
+
+    /** One sentence naming the row and what its number means; also the tooltip. */
+    function rowSentence(row, t) {
+      const base = { name: row.name, unit: row.unitShort, amount: row.amount };
+      if (row.state === 'ok') return row.value === 0 ? t('row.spent', base) : t('row.ok', base);
+      if (row.state === 'empty') return t('row.empty', base);
       if (row.state === 'unknown') {
-        // Carry the reason: "no balance returned" alone leaves the reader with
-        // nothing to act on, and the reason distinguishes a missing sign-in
-        // from a failed query.
-        return row.reason ? `${t('state.unknown')}（${row.reason}）` : t('state.unknown');
+        return t('row.unknown', { ...base, reason: row.reason ? `（${row.reason}）` : '' });
       }
-      return t('state.failed', { reason: row.reason || t('state.failed.short') });
+      return t('row.failed', { ...base, reason: row.reason || t('state.failed') });
     }
 
-    /** The display name of a channel, falling back to its id before any rows exist. */
-    function channelName(rows, channelId) {
+    /** Everything the chip needs: its vendor mark, its figure, and its tooltip. */
+    function chipParts(rows, channelId, t) {
       const row = rows.find(candidate => candidate.id === channelId);
-      return row === undefined ? channelId : row.name;
+      if (row === undefined) return { mark: '#8A8F98', figure: '—', unit: '', title: '' };
+      if (row.state === 'ok' && row.value !== 0) {
+        return {
+          mark: row.accent,
+          figure: `${row.amount}${row.partial ? '+?' : ''}`,
+          unit: row.unitShort,
+          title: rowSentence(row, t),
+        };
+      }
+      return { mark: row.accent, figure: rowFigure(row, t).text, unit: '', title: rowSentence(row, t) };
     }
 
-    /** The chip's own text once a balance is known for the current channel. */
-    function chipText(rows, channelId, t) {
-      const row = rows.find(candidate => candidate.id === channelId);
-      if (row === undefined || row.state !== 'ok') return '—';
-      if (row.value === 0) return t('state.spent');
-      return `${row.amount}${row.partial ? '+?' : ''}`;
+    function summaryText(rows, t) {
+      if (rows.length === 0) return t('panel.none');
+      // "Has a balance" means a signed-in channel with something left: a real
+      // zero is signed in but empty, and counting it would overstate the haul.
+      const funded = rows.filter(row => row.state === 'ok' && row.value !== 0).length;
+      if (funded > 0) return t('foot.some', { count: funded });
+      if (rows.every(row => row.state === 'empty')) return t('foot.signedOut');
+      if (rows.every(row => row.state === 'ok')) return t('foot.spent');
+      return t('foot.unknown');
+    }
+
+    /**
+     * The wall clock of the last fetch. The panel is deliberately cached until
+     * the user asks again, so how stale the numbers are is real information.
+     */
+    function clockText(date) {
+      if (date === null) return '';
+      const pad = value => String(value).padStart(2, '0');
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
     /**
@@ -165,11 +283,9 @@ window.__ModuleLoader__.load({
     async function loadRows(readConnection, sessionId, signal, channelsRef) {
       const connection = readConnection();
       const rpc = connection && connection.rpc ? connection.rpc : undefined;
-      // The channel table is static for the life of the package, so ask the
-      // host for it once and keep it: a panel opened ten times must not fetch
-      // it ten times.
+      // The channel table is static for the life of the package: ask once.
       if (channelsRef.current === null) {
-        channelsRef.current = await fetch(`${ENDPOINT}?sessionId=${encodeURIComponent(String(sessionId))}`, { signal })
+        channelsRef.current = await fetch(`${ENDPOINT}`, { signal })
           .then(response => (response.ok ? response.json() : null))
           .then(payload => (payload && Array.isArray(payload.channels) ? payload.channels : []))
           .catch(() => []);
@@ -227,13 +343,13 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = React.useState(false);
       const [rows, setRows] = React.useState([]);
       const [busy, setBusy] = React.useState(false);
+      const [fetchedAt, setFetchedAt] = React.useState(null);
       const sessionId = props.sessionId;
       const t = props.t;
       const wrapRef = React.useRef(null);
 
       // Reactive, not a one-shot: switching the model re-renders this chip, so
       // its visibility and its channel follow the composer without a reload.
-      // A shell whose props lack the hook simply never shows the chip.
       const useProjection = props.useProjection;
       const projection = typeof useProjection === 'function' ? useProjection('modelSelection') : undefined;
       const selection = readSelection(projection);
@@ -242,8 +358,6 @@ window.__ModuleLoader__.load({
       // to show; that includes every New API model, so no chip appears.
       const channelId = provider !== null && props.channelIds.has(provider) ? provider : null;
 
-      // The channel table is static for the life of the package: fetch once,
-      // keep forever.
       const channelsRef = React.useRef(null);
 
       const load = React.useCallback(async () => {
@@ -252,6 +366,7 @@ window.__ModuleLoader__.load({
         try {
           const next = await loadRows(props.readConnection, sessionId, controller.signal, channelsRef);
           setRows(next);
+          setFetchedAt(new Date());
         } catch {
           setRows([]);
         } finally {
@@ -261,10 +376,10 @@ window.__ModuleLoader__.load({
 
       const toggle = React.useCallback(() => { setOpen(previous => !previous); }, []);
 
-      // One fetch per page life. The rows cover every channel at once, so the
-      // chip can follow any model switch without refetching: switching the
-      // model only re-reads the same cache. The refresh button is the sole
-      // way to ask again — never a timer, never a reopen.
+      // One fetch per page life, then it stays put. The rows cover every
+      // channel at once, so switching the model only re-reads this cache: the
+      // rule is "show the numbers by yourself, but never ask again unless I
+      // press refresh".
       const fetchedOnce = React.useRef(false);
       React.useEffect(() => {
         if (channelId !== null && fetchedOnce.current === false) {
@@ -273,56 +388,89 @@ window.__ModuleLoader__.load({
         }
       }, [channelId, load]);
 
-      // Click anywhere outside the chip/panel closes the panel. The listener
-      // only exists while the panel is open, and never refetches anything.
+      // Clicking anywhere outside closes; Escape closes. Neither refetches,
+      // and focus is not stolen, so typing continues uninterrupted.
       React.useEffect(() => {
-        if (!open || typeof document === 'undefined') return;
-        const close = event => {
+        if (!open || typeof document === 'undefined') return undefined;
+        const onPointerDown = event => {
           const root = wrapRef.current;
           if (root !== null && root.contains && !root.contains(event.target)) setOpen(false);
         };
-        document.addEventListener('mousedown', close);
-        return () => document.removeEventListener('mousedown', close);
+        const onKeyDown = event => { if (event.key === 'Escape') setOpen(false); };
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+          document.removeEventListener('mousedown', onPointerDown);
+          document.removeEventListener('keydown', onKeyDown);
+        };
       }, [open]);
 
       if (channelId === null) return null;
 
+      const chip = chipParts(rows, channelId, t);
+      const stamp = clockText(fetchedAt);
+
       const body = rows.length === 0
         ? h('div', { className: 'ofm-balance-row' },
-          h('span', { className: 'ofm-balance-muted' }, busy ? t('panel.loading') : t('panel.none')))
-        : rows.map(row => h('div', {
-          key: row.id,
-          className: 'ofm-balance-row',
-          'data-current': row.id === channelId ? 'true' : 'false',
-        },
-        h('span', { className: 'ofm-balance-name' }, row.name),
-        h('span', {
-          className: row.state === 'ok' ? 'ofm-balance-value' : 'ofm-balance-value ofm-balance-muted',
-        }, valueText(row, t))));
+          h('span', { className: 'ofm-balance-name' }, busy ? t('panel.loading') : t('panel.none')))
+        : rows.map(row => {
+          const isCurrent = row.id === channelId;
+          const figure = rowFigure(row, t);
+          const unit = rowUnit(row);
+          return h('div', {
+            key: row.id,
+            className: 'ofm-balance-row',
+            'data-current': isCurrent ? 'true' : 'false',
+            style: { '--ofm-row-mark': row.accent },
+            title: rowSentence(row, t),
+          },
+          h('span', {
+            className: 'ofm-balance-spine',
+            'data-on': isCurrent ? 'true' : 'false',
+          }),
+          h('span', { className: 'ofm-balance-name' }, row.name),
+          unit === '' ? null : h('span', { className: 'ofm-balance-unit' }, unit),
+          h('span', {
+            className: figure.quiet ? 'ofm-balance-quiet' : 'ofm-balance-figure',
+          }, figure.text));
+        });
 
-      const panel = h('div', { className: 'ofm-balance-panel' },
-        h('div', { className: 'ofm-balance-head' },
-          h('span', null, t('panel.title')),
-          h('button', {
-            type: 'button',
-            className: 'ofm-balance-refresh',
-            title: t('panel.refresh'),
-            'data-busy': busy ? 'true' : 'false',
-            // Not disabled: a disabled button shows no spin and reads dead.
-            // The refetch is idempotent-safe (worst case: one redundant call).
-            onClick: () => { if (!busy) load(); },
-          }, '↻')),
-        body);
+      const panel = h('div', {
+        className: 'ofm-balance-panel',
+        role: 'dialog',
+        'aria-label': t('panel.title'),
+      },
+      h('div', { className: 'ofm-balance-head' },
+        h('span', { className: 'ofm-balance-title' }, t('panel.title')),
+        stamp === '' ? null : h('span', {
+          className: 'ofm-balance-stamp',
+          title: t('panel.stamp', { time: stamp }),
+        }, stamp),
+        h('button', {
+          type: 'button',
+          className: 'ofm-balance-refresh',
+          title: t('panel.refresh'),
+          'aria-label': t('panel.refresh'),
+          'data-busy': busy ? 'true' : 'false',
+          // Never disabled: a disabled button shows no spin and reads as dead.
+          onClick: () => { if (!busy) load(); },
+        }, '↻')),
+      h('div', { className: 'ofm-balance-list' }, body),
+      h('div', { className: 'ofm-balance-foot' }, summaryText(rows, t)));
 
       return h('span', { className: 'ofm-balance-wrap', ref: wrapRef },
         h('button', {
           type: 'button',
           className: 'ofm-balance-chip',
-          title: t('chip.title', { channel: channelName(rows, channelId) }),
+          title: chip.title,
           'data-channel': channelId,
           'aria-expanded': open ? 'true' : 'false',
+          style: { '--ofm-mark': chip.mark },
           onClick: toggle,
-        }, `⛁ ${rows.length === 0 ? (busy ? '…' : '—') : chipText(rows, channelId, t)}`),
+        },
+        h('span', { className: 'ofm-balance-mark' }),
+        h('span', { className: 'ofm-balance-chip-figure' }, busy && rows.length === 0 ? '…' : chip.figure),
+        chip.unit === '' ? null : h('span', { className: 'ofm-balance-chip-unit' }, chip.unit)),
         open ? panel : null);
     }
 

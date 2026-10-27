@@ -127,3 +127,18 @@ test('小数进位正确', () => {
   assert.equal(normalizeRow('trae', env([{ accountId: 'a', balance: 12.35 }])).amount, '12.4')
   assert.equal(normalizeRow('trae', env([{ accountId: 'a', balance: 4.1 }])).amount, '4.1')
 })
+
+// ── 界面重设计：行带上厂商色与短单位，供客户端直接使用 ──────────────────────
+
+test('行携带厂商品牌色与短单位', () => {
+  const row = normalizeRow('loomy', env([{ accountId: 'a', balance: { total: 573 } }]))
+  assert.equal(row.accent, '#2F6BFF')
+  assert.equal(row.unitShort, '积分')
+})
+
+test('无数据状态也带品牌色（未登录的行仍属于该厂商）', () => {
+  const row = normalizeRow('qoder', env([]))
+  assert.equal(row.state, 'empty')
+  assert.equal(row.accent, '#615CED')
+  assert.equal(row.unitShort, '积分')
+})
