@@ -1,2 +1,7 @@
 .superpowers/
 node_modules/
+*.tgz
+*.log
+preview.html
+.DS_Store
+Thumbs.db
