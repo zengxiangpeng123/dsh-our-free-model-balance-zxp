@@ -78,7 +78,7 @@ window.__ModuleLoader__.load({
         position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 40;
         box-sizing: border-box; width: 300px;
         max-width: min(300px, calc(100vw - 28px));
-        border-radius: 12px; overflow: hidden;
+        border-radius: 12px; overflow: visible;
         border: 1px solid var(--dsw-alias-border-l2, rgba(128, 132, 140, .34));
         background: var(--dsw-alias-bg-layer-1, Canvas);
         color: var(--dsw-alias-label-primary, CanvasText);
@@ -121,8 +121,17 @@ window.__ModuleLoader__.load({
 
       .ofm-balance-list { padding: 5px 0 4px; }
       .ofm-balance-row {
+        position: relative;
         display: flex; align-items: baseline; gap: 8px;
         padding: 5px 13px 5px 0;
+      }
+      /* Rows are focusable so the card is reachable without a mouse. */
+      .ofm-balance-row:focus-visible {
+        outline: 2px solid var(--ofm-focus, #4C7DFF); outline-offset: -2px;
+      }
+      .ofm-balance-row:last-child:hover,
+      .ofm-balance-row:last-child:focus-within {
+        border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
       }
       .ofm-balance-row:hover { background: rgba(128, 132, 140, .09); }
       .ofm-balance-spine {
@@ -164,6 +173,65 @@ window.__ModuleLoader__.load({
       .ofm-balance-emptyhint { margin-top: 4px; font-size: 10px; opacity: .5; line-height: 1.5; }
 
       .ofm-balance-foot { padding: 8px 13px 10px; font-size: 10px; opacity: .55; }
+
+      /* ── hover card ────────────────────────────────────────────────────
+         Never receives the pointer: pointer-events: none is what makes the
+         flicker the usual hover-card suffers structurally impossible — the
+         cursor cannot enter the card, so it cannot leave the row either. */
+      .ofm-balance-card {
+        position: absolute; left: 12px; right: 12px; z-index: 6;
+        box-sizing: border-box;
+        padding: 8px 10px 9px; border-radius: 9px;
+        border: 1px solid var(--dsw-alias-border-l2, rgba(128, 132, 140, .34));
+        background: var(--dsw-alias-bg-layer-1, Canvas);
+        color: var(--dsw-alias-label-primary, CanvasText);
+        box-shadow: 0 10px 22px -10px rgba(0, 0, 0, .32), 0 2px 5px rgba(0, 0, 0, .10);
+        opacity: 0; visibility: hidden;
+        transition: opacity .09s ease-out;
+        pointer-events: none;
+        text-align: left;
+      }
+      .ofm-balance-card[data-flip="false"] { top: calc(100% + 4px); }
+      .ofm-balance-card[data-flip="true"] { bottom: calc(100% + 4px); }
+      .ofm-balance-row:hover .ofm-balance-card,
+      .ofm-balance-row:focus-within .ofm-balance-card,
+      .ofm-balance-chipbox:hover .ofm-balance-card,
+      .ofm-balance-chipbox:focus-within .ofm-balance-card {
+        opacity: 1; visibility: visible;
+      }
+      .ofm-balance-card-head {
+        display: flex; align-items: baseline; gap: 8px;
+        padding-bottom: 5px; margin-bottom: 4px;
+        border-bottom: 1px solid var(--ofm-hair, rgba(128, 132, 140, .18));
+      }
+      .ofm-balance-card-title {
+        flex: 1 1 auto; min-width: 0; font-size: 11.5px; opacity: .85;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .ofm-balance-card-total {
+        flex: 0 0 auto; font-size: 13px; font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .ofm-balance-card-sub { font-size: 10px; opacity: .45; font-weight: 400; }
+      .ofm-balance-card-line {
+        display: flex; align-items: baseline; gap: 8px;
+        padding: 2px 0;
+      }
+      .ofm-balance-card-name {
+        flex: 1 1 auto; min-width: 0; font-size: 10.5px; opacity: .7;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .ofm-balance-card-amount {
+        flex: 0 0 auto; font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .ofm-balance-card-amount[data-error="true"] { opacity: .55; font-size: 10px; }
+
+      .ofm-balance-chipbox { position: relative; display: inline-flex; }
+      .ofm-balance-chipbox .ofm-balance-card {
+        left: 0; right: auto; width: 250px;
+        bottom: calc(100% + 6px); top: auto;
+      }
 
       /* Settings page. Same language as the popover: hairlines, no cards,
          sentence case, one accent, nothing shouting. */
@@ -450,6 +518,40 @@ window.__ModuleLoader__.load({
       return typeof selection.provider === 'string' && selection.provider !== '' ? selection : null;
     }
 
+    /**
+     * The hover card: the exact total on top, then one line per account.
+     *
+     * It exists because the row shows a sum, and a sum hides the thing a
+     * multi-account pool makes you want to know — which account holds what.
+     * Marked `aria-hidden`: the row already carries the same information in its
+     * `aria-label`, so assistive tech is not told it twice.
+     */
+    function accountCard(row, t, flip) {
+      const lines = (row.accounts ?? []).map((account, index) => h('div', {
+        key: `${row.id}-acct-${index}`,
+        className: 'ofm-balance-card-line',
+      },
+      h('span', { className: 'ofm-balance-card-name' }, account.name),
+      h('span', {
+        className: 'ofm-balance-card-amount',
+        'data-error': account.note === '' ? 'false' : 'true',
+      }, account.note === '' ? `${account.exact} ${row.unitShort}` : account.note)))
+
+      const total = row.state === 'ok'
+        ? h('span', { className: 'ofm-balance-card-total' }, `${row.exact} ${row.unitShort}`)
+        : h('span', { className: 'ofm-balance-card-total ofm-balance-card-sub' }, rowSentence(row, t))
+
+      return h('div', {
+        className: 'ofm-balance-card',
+        'data-flip': flip ? 'true' : 'false',
+        'aria-hidden': 'true',
+      },
+      h('div', { className: 'ofm-balance-card-head' },
+        h('span', { className: 'ofm-balance-card-title' }, row.name),
+        total),
+      lines.length === 0 ? null : lines)
+    }
+
     function Chip(props) {
       const [open, setOpen] = React.useState(false);
       const [snapshot, setSnapshot] = React.useState(null);
@@ -588,7 +690,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'ofm-balance-emptyhint' },
             allHidden ? t('empty.allHiddenHint') : t('empty.hint')));
       } else {
-        body = h('div', { className: 'ofm-balance-list' }, visible.map(row => {
+        body = h('div', { className: 'ofm-balance-list' }, visible.map((row, index) => {
           const spent = isSpent(row);
           const current = row.id === channelId && !spent;
           const showFigure = hasFuel(row);
@@ -606,13 +708,18 @@ window.__ModuleLoader__.load({
           } else {
             tail = h('span', { className: 'ofm-balance-quiet' }, word);
           }
+          // Lower rows open the card upwards so it cannot fall off the panel's
+          // bottom edge. Decided by index rather than by measuring the DOM, so
+          // there is no layout read and no chance of it oscillating.
+          const flip = index >= Math.ceil(visible.length * 0.6);
           return h('div', {
             key: row.id,
             className: 'ofm-balance-row',
+            tabIndex: 0,
             'data-current': current ? 'true' : 'false',
             'data-spent': spent && settings.redWhenSpent !== false ? 'true' : 'false',
             style: { '--ofm-row-mark': row.accent },
-            title: rowSentence(row, t),
+            'aria-label': rowSentence(row, t),
           },
           h('span', {
             className: 'ofm-balance-spine',
@@ -620,7 +727,8 @@ window.__ModuleLoader__.load({
           }),
           h('span', { className: 'ofm-balance-name' }, row.name),
           unit,
-          tail);
+          tail,
+          accountCard(row, t, flip));
         }));
       }
 
@@ -669,19 +777,23 @@ window.__ModuleLoader__.load({
         : h('div', { className: 'ofm-balance-foot' }, summaryText(visible, t)));
 
       return h('span', { className: 'ofm-balance-wrap', ref: wrapRef },
-        h('button', {
-          type: 'button',
-          className: 'ofm-balance-chip',
-          title: byId === undefined ? '' : rowSentence(byId, t),
-          'data-channel': channelId,
-          'data-spent': spending && settings.redWhenSpent !== false ? 'true' : 'false',
-          'aria-expanded': open ? 'true' : 'false',
-          style: { '--ofm-mark': chipMark },
-          onClick: () => setOpen(previous => !previous),
-        },
-        h('span', { className: 'ofm-balance-mark' }),
-        settings.chipStyle === 'dot' ? null : h('span', { className: 'ofm-balance-chip-figure' }, chipFigure),
-        chipUnit === '' ? null : h('span', { className: 'ofm-balance-chip-unit' }, chipUnit)),
+        h('span', { className: 'ofm-balance-chipbox' },
+          h('button', {
+            type: 'button',
+            className: 'ofm-balance-chip',
+            // `title` would pop the OS tooltip at the same moment as the card;
+            // the card carries the detail, the label stays for assistive tech.
+            'aria-label': byId === undefined ? '' : rowSentence(byId, t),
+            'data-channel': channelId,
+            'data-spent': spending && settings.redWhenSpent !== false ? 'true' : 'false',
+            'aria-expanded': open ? 'true' : 'false',
+            style: { '--ofm-mark': chipMark },
+            onClick: () => setOpen(previous => !previous),
+          },
+          h('span', { className: 'ofm-balance-mark' }),
+          settings.chipStyle === 'dot' ? null : h('span', { className: 'ofm-balance-chip-figure' }, chipFigure),
+          chipUnit === '' ? null : h('span', { className: 'ofm-balance-chip-unit' }, chipUnit)),
+          byId === undefined ? null : accountCard(byId, t, false)),
         open ? panel : null);
     }
 

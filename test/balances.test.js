@@ -153,3 +153,66 @@ test('无数据状态也带品牌色（未登录的行仍属于该厂商）', ()
   assert.equal(row.accent, '#615CED')
   assert.equal(row.unitShort, '积分')
 })
+
+// ── 千以上的缩写：与 OFM 自己的 kilo() 同口径 ─────────────────────────────
+// OFM 的规则：≥1e7 → 0 位小数的 M；≥1e6 → 1 位小数的 M；
+// ≥10K → 0 位小数的 K；≥1K → 1 位小数的 K；其余按原数。
+// 千以下我们保留需求方要过的一位小数，不用 OFM 的取整。
+
+test('千以上按 OFM 口径缩写', () => {
+  assert.equal(normalizeRow('loomy', env([{ accountId: 'a', balance: { total: 15000 } }])).amount, '15K')
+  assert.equal(normalizeRow('raccoon', env([{ accountId: 'a', balance: { total: 7510 } }])).amount, '7.5K')
+  assert.equal(normalizeRow('zcode', env([{ accountId: 'a', balance: { total: 8000000 } }])).amount, '8.0M')
+  assert.equal(normalizeRow('zcode', env([{ accountId: 'a', balance: { total: 12000000 } }])).amount, '12M')
+})
+
+test('千以下保留一位小数（不改口径）', () => {
+  assert.equal(normalizeRow('trae', env([{ accountId: 'a', balance: { total: 356.2848 } }])).amount, '356.3')
+  assert.equal(normalizeRow('loomy', env([{ accountId: 'a', balance: { total: 573 } }])).amount, '573')
+})
+
+// ── 悬浮显示逐账号明细 ────────────────────────────────────────────────────
+
+test('行携带逐账号明细（昵称 + 余额 + 读不到的原因），供悬浮弹出', () => {
+  const row = normalizeRow('raccoon', env([
+    { accountId: 'r1', nickname: 'RaccoonElizabeth (6491)', balance: { total: 380 } },
+    { accountId: 'r2', nickname: '151******91', balance: { total: 7130 } },
+    { accountId: 'r3', nickname: '第三个', balance: null, error: '凭据未配置' },
+  ]))
+  assert.equal(row.value, 7510, '总和不变')
+  assert.equal(row.partial, true)
+  assert.equal(row.accounts.length, 3)
+  assert.equal(row.accounts[0].name, 'RaccoonElizabeth (6491)')
+  assert.equal(row.accounts[0].amount, '380')
+  assert.equal(row.accounts[1].amount, '7.1K')
+  assert.equal(row.accounts[2].note, '凭据未配置')
+  assert.equal(row.accounts[2].amount, '')
+})
+
+test('昵称缺失时退回账号 id', () => {
+  const row = normalizeRow('loomy', env([{ accountId: 'loomy-abc', balance: { total: 100 } }]))
+  assert.equal(row.accounts[0].name, 'loomy-abc')
+})
+
+test('没有账号时 accounts 为空数组', () => {
+  assert.deepEqual(normalizeRow('qoder', env([])).accounts, [])
+})
+
+// ── 悬浮卡片：总额与逐账号都要两位小数的精确值 ────────────────────────────
+
+test('精确值格式化到两位小数，供悬浮卡片使用', () => {
+  const row = normalizeRow('raccoon', env([
+    { accountId: 'r1', nickname: 'A', balance: { total: 380 } },
+    { accountId: 'r2', nickname: 'B', balance: { total: 7130.004 } },
+  ]))
+  assert.equal(row.exact, '7510.00', '总额两位小数')
+  assert.equal(row.accounts[0].exact, '380.00')
+  assert.equal(row.accounts[1].exact, '7130.00', '多余的小数位要进位/截断')
+  assert.equal(row.amount, '7.5K', '行内仍是缩写，两种表示并存')
+})
+
+test('零与小额也保留两位小数', () => {
+  assert.equal(normalizeRow('trae', env([{ accountId: 'a', balance: 0 }])).exact, '0.00')
+  assert.equal(normalizeRow('cline', env([{ accountId: 'a', balance: 0.04 }])).exact, '0.04')
+  assert.equal(normalizeRow('zcode', env([{ accountId: 'a', balance: { total: 8000000 } }])).exact, '8000000.00')
+})

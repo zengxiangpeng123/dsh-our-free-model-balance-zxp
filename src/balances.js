@@ -28,8 +28,10 @@ function blank(id, name, unit) {
     state: /** @type {RowState} */ ('unavailable'),
     value: null,
     amount: '',
+    exact: '',
     partial: false,
     reason: '',
+    accounts: [],
   }
 }
 
@@ -104,19 +106,58 @@ export function normalizeRow(channelId, envelope) {
   // disagreed with the source of truth.
   const exact = values.reduce((total, value) => total + value, 0)
   row.value = exact
+  // Two representations on purpose: `amount` is abbreviated for the row (7.3K,
+  // scannable at a glance), `exact` keeps every digit for the hover card, where
+  // the user is reading one number carefully rather than comparing a column.
   row.amount = formatAmount(exact)
+  row.exact = formatExact(exact)
   row.partial = partial
   row.reason = reason
+  // Per-account detail, for the hover. The sum alone hides what a user with
+  // several accounts in one pool actually wants to see: which account holds
+  // how much, and which one could not be read.
+  row.accounts = accounts.map(account => {
+    const total = balanceTotal(account?.balance)
+    return {
+      name: typeof account?.nickname === 'string' && account.nickname !== ''
+        ? account.nickname
+        : String(account?.accountId ?? ''),
+      amount: total === null ? '' : formatAmount(total),
+      exact: total === null ? '' : formatExact(total),
+      note: total === null ? (typeof account?.error === 'string' ? account.error : '查询失败') : '',
+    }
+  })
   return row
 }
 
 /**
- * The display form of a balance: one decimal place, and no decimal point at
- * all for whole numbers. The chip and each panel row are narrow, so a raw
- * 356.2848 becomes "356.3" while 573 stays "573".
+ * The unabbreviated form, always two decimals: `7510.00`, `0.04`, `8000000.00`.
+ * The hover card shows this one, because "which account holds how much" is a
+ * question about exact figures, not order of magnitude.
+ */
+function formatExact(value) {
+  if (!Number.isFinite(value)) return ''
+  return value.toFixed(2)
+}
+
+/**
+ * The display form of a balance.
+ *
+ * Above a thousand it abbreviates with OFM's own rule (`kilo()` in its
+ * client.js): ≥10M → whole M, ≥1M → one-decimal M, ≥10K → whole K, ≥1K →
+ * one-decimal K — so a channel's total reads "15K" here exactly as it does on
+ * OFM's panel. Below a thousand it keeps the one-decimal precision the user
+ * asked for earlier, which OFM's own function would round away.
  */
 function formatAmount(value) {
   if (!Number.isFinite(value)) return ''
+  const whole = Math.round(value)
+  if (Math.abs(whole) >= 1_000_000) {
+    return `${(whole / 1_000_000).toFixed(whole >= 10_000_000 ? 0 : 1)}M`
+  }
+  if (Math.abs(whole) >= 1000) {
+    return `${(whole / 1000).toFixed(whole >= 10_000 ? 0 : 1)}K`
+  }
   const rounded = Math.round(value * 10) / 10
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
 }
