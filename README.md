@@ -1,5 +1,8 @@
 # dsh-our-free-model-balance-zxp
 
+> **前提：先装 `dsh-our-free-model`（OFM），并在里面登录至少一个渠道。**
+> 没有 OFM，这个插件装上也只会显示「读不到 Our Free Model」，不会有任何数字。
+
 在 DSH 输入框旁显示 **Our Free Model（OFM）** 当前渠道的剩余额度，点开可看全部渠道。
 
 ## 它显示什么

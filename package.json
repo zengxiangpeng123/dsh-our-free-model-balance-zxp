@@ -3,7 +3,7 @@
   "version": "1.1.1",
   "type": "module",
   "main": "./index.js",
-  "description": "在输入框旁显示 Our Free Model 当前渠道的剩余额度，点开看全部渠道。需要先安装 dsh-our-free-model 并登录至少一个渠道。",
+  "description": "需要先安装 dsh-our-free-model 并在其中登录至少一个渠道。之后在输入框旁显示当前渠道的剩余额度，点开可看全部渠道。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
